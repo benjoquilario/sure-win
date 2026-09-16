@@ -1,0 +1,29 @@
+{
+  "name": "@workspace/schema",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Appwrite schema, access models and roles shared by the CMS and the mobile app. SDK-agnostic by design: no dependencies, no Appwrite imports.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/schema.ts",
+  "types": "./src/schema.ts",
+  "exports": {
+    ".": {
+      "types": "./src/schema.ts",
+      "default": "./src/schema.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "check:pure": "node ./scripts/assert-pure.mjs",
+    "lint": "node ./scripts/assert-pure.mjs"
+  },
+  "devDependencies": {
+    "@workspace/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

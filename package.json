@@ -1,0 +1,27 @@
+{
+  "name": "sure-win",
+  "private": true,
+  "packageManager": "pnpm@11.0.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:cms": "turbo run dev --filter=@workspace/cms",
+    "dev:mobile": "turbo run dev --filter=@workspace/mobile",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "check": "turbo run check:boundaries check:pure typecheck lint",
+    "check:boundaries": "node scripts/check-sdk-boundaries.mjs",
+    "appwrite:bootstrap": "pnpm --filter @workspace/cms appwrite:bootstrap",
+    "appwrite:inspect": "pnpm --filter @workspace/cms appwrite:inspect",
+    "appwrite:recount": "pnpm --filter @workspace/cms appwrite:recount",
+    "appwrite:expire": "pnpm --filter @workspace/cms appwrite:expire",
+    "appwrite:seed:plans": "pnpm --filter @workspace/cms appwrite:seed:plans"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.13",
+    "typescript": "catalog:"
+  }
+}

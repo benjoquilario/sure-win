@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Boundaries, typecheck, CMS build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # reads packageManager from package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run check:boundaries check:pure typecheck
+      - run: pnpm turbo run build --filter=@workspace/cms
+        env:
+          # Placeholders: `next build` only needs the variables to exist.
+          NEXT_PUBLIC_APPWRITE_ENDPOINT: https://cloud.appwrite.io/v1
+          NEXT_PUBLIC_APPWRITE_PROJECT_ID: ci
+          APPWRITE_API_KEY: ci
+          APPWRITE_DATABASE_ID: ci
+
+  lint:
+    name: Lint (non-blocking until the pre-existing hooks findings are fixed)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run lint --continue

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.*"],
+      "env": [
+        "NEXT_PUBLIC_*",
+        "APPWRITE_*",
+        "GOOGLE_PLAY_*",
+        "EXPO_PUBLIC_*",
+        "EXPO_UNSTABLE_*"
+      ],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"]
+    },
+    "check:pure": {},
+    "//#check:boundaries": {
+      "inputs": ["apps/*/package.json", "packages/*/package.json", "apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "scripts/check-sdk-boundaries.mjs"]
+    }
+  }
+}

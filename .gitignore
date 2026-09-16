@@ -1,0 +1,61 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# turbo
+.turbo/
+
+# next.js
+.next/
+out/
+build/
+
+# expo / react native
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+apps/mobile/ios/
+apps/mobile/android/
+app-example
+
+# testing
+coverage/
+
+# env files - the templates are the opt-in
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# misc
+.DS_Store
+*.pem
+.vercel
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# large media / recordings
+*.webm
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# office temp lock files
+~$*

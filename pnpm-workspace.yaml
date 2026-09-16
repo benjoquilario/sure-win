@@ -1,0 +1,33 @@
+packages:
+  - apps/*
+  - packages/*
+  - functions/*
+
+# One version of anything that both apps (and their shared packages) load.
+# React in particular must resolve to a single copy inside each app bundle, and
+# Expo 57 pins react to exactly 19.2.3, so the CMS follows it.
+catalog:
+  react: 19.2.3
+  react-dom: 19.2.3
+  "@types/react": ~19.2.14
+  typescript: ~6.0.3
+  eslint: ^9.39.4
+
+# Build scripts stay blocked: tsx ships a prebuilt esbuild binary and works
+# without it, and nothing here needs sharp's or msw's postinstall.
+allowBuilds:
+  esbuild: false
+  msw: false
+  sharp: false
+  unrs-resolver: false
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+
+# Overrides (moved from apps/mobile package.json "overrides").
+# react-native-appwrite 0.34 declares expo-file-system 18.x as a dependency;
+# a second copy of a native Expo module breaks the native build, so it is
+# forced onto the SDK 57 version the app already uses.
+overrides:
+  expo-file-system: ~57.0.7
+  "markdown-it>entities": ^2.0.0

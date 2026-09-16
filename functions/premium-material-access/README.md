@@ -1,0 +1,98 @@
+# Premium Material Access Function
+
+This Appwrite Function is scaffolded inside the same repository so premium checks can live beside the mobile app without needing a separate repository.
+
+## Purpose
+
+- Accept a `materialId`
+- Read the signed-in user's `user_profiles` document
+- Check `isPremium`
+- Return the learning material only when access is allowed
+
+## Expected Environment Variables
+
+- `APPWRITE_API_ENDPOINT`
+- `APPWRITE_PROJECT_ID`
+- `APPWRITE_DATABASE_ID`
+- `USER_PROFILES_COLLECTION_ID` (optional, defaults to `user_profiles`)
+- `LEARNING_MATERIALS_COLLECTION_ID` (optional, defaults to `learning_materials`)
+- `PREMIUM_ACCESS_DEBUG_MODE` (optional, set to `true` only in development)
+
+Notes:
+
+- The function now supports Appwrite's built-in function variables too:
+  - `APPWRITE_FUNCTION_API_ENDPOINT`
+  - `APPWRITE_FUNCTION_PROJECT_ID`
+  - `APPWRITE_FUNCTION_API_KEY`
+- Preferred setup: let Appwrite provide the runtime key through function scopes.
+- Fallback setup: define a manual `APPWRITE_API_KEY` if you prefer.
+- The function now also supports either Appwrite Tables (`TablesDB`) or the older Documents API (`Databases`) at runtime, so deployments on mixed SDK/runtime versions can still resolve premium content.
+
+## Invocation Shape
+
+Use `POST` with a JSON body:
+
+```json
+{
+  "materialId": "learning-material-document-id"
+}
+```
+
+Accepted alternatives for quick/manual tests:
+
+- Raw body string: `learning-material-document-id`
+- Query string on path: `/?materialId=learning-material-document-id`
+
+The function expects Appwrite to pass the authenticated user id through the request headers.
+
+## Status Code Troubleshooting
+
+- `200`: success, material returned
+- `400`: missing or invalid `materialId`
+- `401`: no authenticated Appwrite user context was provided
+- `403`: user context exists but premium access is denied for this material
+- `405`: execution method is not `POST`
+
+If you see `403`, open the execution response body and check the `debug` object (`profileFound`, `isPremiumUser`, `materialIsPremium`).
+
+When `PREMIUM_ACCESS_DEBUG_MODE=true`, `403` responses include:
+
+- `accessDecision`: `premium_material_denied`
+- `failureReason`: `profile_missing` or `profile_found_but_isPremium_false`
+
+## Appwrite Console Settings
+
+- Trigger: `HTTP`
+- Execution method: `POST`
+- Path: `/`
+- Schedule: leave empty
+- Execute asynchronously: `false` for the mobile app flow, so the caller receives the material payload in the same request
+- Entrypoint: `main.js`
+- Execute access: allow authenticated users
+- Function scopes: allow database read access needed for `user_profiles` and `learning_materials`
+
+The repository includes both `main.js` (root entrypoint) and `src/main.js` (implementation) so Appwrite deployments that expect a root entrypoint work without extra changes.
+
+This function is meant to be executed on demand from the app, not on a cron schedule. The app should trigger an execution against the deployed function ID, so there is no separate public route you need to hardcode beyond the Appwrite execution endpoint. In Appwrite SDK terms, the request goes through:
+
+```ts
+functions.createExecution({
+  functionId: "<YOUR_FUNCTION_ID>",
+  body: JSON.stringify({ materialId: "<MATERIAL_ID>" }),
+  async: false,
+  xpath: "/",
+  method: ExecutionMethod.POST,
+})
+```
+
+If you add your own internal routing later, then `xpath` can change. With the current `src/main.js`, keep it at `/`.
+
+## Mobile App Configuration
+
+Set this Expo public env var so the app can call the deployed function:
+
+- `EXPO_PUBLIC_APPWRITE_PREMIUM_MATERIAL_FUNCTION_ID`
+
+## Suggested Next Step
+
+After deploying this function and setting `EXPO_PUBLIC_APPWRITE_PREMIUM_MATERIAL_FUNCTION_ID`, premium lesson detail reads can flow through the function instead of directly exposing premium material bodies from the collection.

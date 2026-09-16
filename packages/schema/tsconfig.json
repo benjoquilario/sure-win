@@ -1,0 +1,10 @@
+{
+  "extends": "@workspace/typescript-config/library.json",
+  "compilerOptions": {
+    // No DOM, no Node, no ambient types. If this file ever needs `window`,
+    // `process` or an SDK, it no longer belongs in the shared schema.
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src"]
+}
