@@ -8,6 +8,9 @@ The short version: the CMS and the backend are essentially finished. What is
 missing is almost entirely **outside** the code - Google Play console setup,
 credentials, and one unwritten piece of the mobile app.
 
+> Looking for how to actually upload questions? That is its own page, written
+> for the people who do it: **[uploading-questions.md](uploading-questions.md)**.
+
 ---
 
 ## 1. Payments
@@ -146,72 +149,45 @@ matches. Query `Query.equal("questionnaireId", "")`.
 
 ### Getting questions in
 
-Three routes, all funnelling through one validator (`parseQuestionRow`), so a
-hand-typed question and an uploaded one are held to identical rules.
+**The encoder's guide is [uploading-questions.md](uploading-questions.md).**
+What follows is only what a developer needs to know about the mechanism.
 
-**Spreadsheet** (the main path) - `.xlsx`, `.xlsm`, `.csv`, `.tsv`, `.txt`.
-`.xls` is rejected with "re-save as .xlsx first". Limits: 10 MB, 2000 rows per
-file.
+Three routes - spreadsheet upload, the manual "Add question" dialog, and the
+`appwrite:sheet:from-appendices` text converter - all funnel through one
+validator (`parseQuestionRow`), so hand-typed and uploaded questions are held to
+identical rules.
 
-The intended loop is **download -> edit -> re-upload**: the export carries SKUs,
-so the round trip updates in place rather than duplicating. Download from
-`/api/questions/sheet?categoryId=...`. The generated workbook ships with
-dropdowns on Type/Difficulty/Free Sample and a second sheet explaining each
-column.
+The import is two-pass. The browser uploads once to preview the diff, then
+resubmits the same file to commit; nothing is parked server-side between the
+two. Any row-level error aborts the whole file. Writes run 5 at a time and
+collect per-row failures rather than throwing, so a connection drop mid-upload
+still reports what landed. An import never deletes.
 
-Columns (`spreadsheet.ts:75`):
+Matching is **by SKU only** (`questions.ts:736`). A blank SKU always creates.
+Updates never touch `sku` or `order`, so re-sorting the sheet cannot renumber a
+paper. New SKUs come from a high-water mark read from both `questions.sku` and
+`user_answers.questionSku`, so emptying a category cannot reissue a SKU that
+would inherit a deleted question's answer history.
 
-| Header | Required | Notes |
-| --- | --- | --- |
-| `SKU` | no | **Never type one.** Blank = new question. Present = update that question. |
-| `No` | no | Item number. Blank on a new row appends to the end. |
-| `Question` | **yes** | Max 5000 chars. |
-| `A` `B` `C` `D` `E` | A and B | Up to 8 accepted. A gap (B blank, C filled) is an error, not a silent shift. |
-| `Answer` | **yes** | Letter, full choice text, or True/False. |
-| `Type` | no | `mcq` or `true-false`. Blank = mcq. |
-| `Difficulty` | no | easy/medium/hard. Blank = medium. |
-| `Explanation` | no | Shown after answering. |
-| `Image` | no | A link, or the `/api/assets/...` path from a CMS upload. |
-| `Free Sample` | no | `yes` shows the item to non-premium members. |
+Concurrency safety rests on a unique index on
+`(categoryId, questionnaireId, order)` - `createQuestionWithSku` retries on 409
+rather than serialising. Counts on `exam_categories` and `questionnaires` are
+recounted, never incremented.
 
-Header matching ignores case, spacing and punctuation, and accepts aliases
-(`question text`, `correct answer`, `rationale`, ...). Unknown columns are
-warnings, not errors. Booleans accept `oo`/`opo`/`hindi`/`wala` as well as
-yes/no.
+### Two places document SKU matching wrongly
 
-Import is two-pass: upload previews the diff (created / updated / skipped),
-then the same file is resubmitted to commit. **Any row-level error aborts the
-whole file** - nothing is saved. Writes run 5 at a time and collect per-row
-failures rather than throwing, so a network blip mid-upload still reports what
-landed.
+Both say item numbers identify a question on re-upload. They do not.
 
-**Manual entry** - the "Add question" dialog, or "Add question here" from a
-category or set page.
+- `workbook.ts:291` - the "How to fill this in" tab inside **every downloaded
+  workbook**: *"Item numbers (No) identify a question when you upload the file
+  again: same number means update, new number means add."* This is the sentence
+  an encoder is most likely to read, and following it - typing item numbers into
+  a fresh sheet - silently duplicates the entire paper.
+- `questions.ts:692` - the doc comment above `planQuestionImport`, directly
+  above code that does the opposite.
 
-**Bulk text conversion** - `pnpm appwrite:sheet:from-appendices` turns a plain
-text appendix into a spreadsheet. It writes a file and nothing else; you check
-it and upload it normally. Everything comes out as multiple-choice / medium /
-not-free, so it is meant to be edited first.
-
-### Matching is by SKU, and the guide sheet says otherwise
-
-The importer matches rows to existing questions **only** by SKU
-(`questions.ts:736`). A row with a blank SKU always creates a new question,
-whatever its item number.
-
-Two places say the opposite:
-
-- `workbook.ts:291` - the "How to fill this in" sheet inside every downloaded
-  workbook: *"Item numbers (No) identify a question when you upload the file
-  again: same number means update, new number means add."* This is wrong, and
-  it is the sentence an encoder is most likely to read. Following it - typing
-  item numbers into a fresh sheet and expecting updates - silently duplicates
-  the entire paper.
-- `questions.ts:692` - the doc comment above `planQuestionImport` makes the same
-  claim, directly above code that does the opposite.
-
-The on-screen copy in the import card is correct. **Worth fixing both lines
-before more encoders use this.**
+The on-screen copy in the import card is correct. **Worth fixing both before
+more encoders use this.**
 
 ### Images
 

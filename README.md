@@ -13,6 +13,8 @@ sure-win/
 │   └── typescript-config/  Shared tsconfig bases.
 ├── functions/      Appwrite Functions (standalone CommonJS, deployed from the console)
 ├── docs/
+│   ├── uploading-questions.md  How encoders get questions in (start here)
+│   ├── remaining-work.md       What is still outstanding, and why
 │   ├── schema/     Schema notes and the mobile ↔ backend contract
 │   └── billing/    Google Play billing design notes
 └── scripts/        Repo-level checks (SDK boundary guard)
