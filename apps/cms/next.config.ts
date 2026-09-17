@@ -11,6 +11,19 @@ const workspaceRoot = path.join(__dirname, "..", "..");
 
 const nextConfig: NextConfig = {
   /**
+   * Appwrite Sites runs the site from a single traced bundle rather than from
+   * an installed `node_modules`, so the server has to carry its dependencies
+   * with it. Without this the deployment builds and then hangs in FINALIZING,
+   * because there is no `server.js` for the runtime to start.
+   */
+  output: "standalone",
+  /**
+   * `node-appwrite` is required at runtime by the server, never bundled into a
+   * client chunk; leaving it external keeps it resolvable from the traced
+   * `node_modules` instead of being inlined.
+   */
+  serverExternalPackages: ["node-appwrite"],
+  /**
    * `@workspace/schema` ships TypeScript source (no build step), so Next has to
    * compile it as if it were local code.
    */

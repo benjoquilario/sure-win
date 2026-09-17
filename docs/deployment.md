@@ -6,37 +6,56 @@ touches the other's files. What they share is `packages/schema` and the root
 
 ## CMS → Appwrite Sites
 
-Appwrite Sites has full Next.js support (SSR included, no adapter). In the
-console, **Sites → Create site → Connect Git**, then:
+Appwrite Sites builds Next.js without an adapter, but a workspace needs three
+things set explicitly. In the console, **Sites → Create site → Connect Git**:
 
-| Setting           | Value                                                                  |
-| ----------------- | ---------------------------------------------------------------------- |
-| Framework         | Next.js (auto-detected)                                                |
-| Root directory    | `./` (the repository root - **not** `apps/cms`)                        |
+| Setting           | Value                                                    |
+| ----------------- | -------------------------------------------------------- |
+| Framework         | Next.js                                                  |
+| Root directory    | `./` (the repository root - **not** `./apps` or `./apps/cms`) |
 | Install command   | `corepack enable && pnpm install --frozen-lockfile --filter @workspace/cms...` |
-| Build command     | `pnpm turbo run build --filter=@workspace/cms`                         |
-| Output directory  | `./apps/cms/.next`                                                     |
-| Production branch | `main`                                                                 |
-| Path filter       | `apps/cms/**`, `packages/**`, `pnpm-lock.yaml` (optional; skips mobile-only commits) |
+| Build command     | `pnpm build:cms:appwrite`                                |
+| Output directory  | `./.next/standalone`                                     |
+| Rendering         | Server side rendering                                    |
+| Production branch | `main`                                                   |
 
-Why the root directory is `./`: the CMS depends on `packages/schema` and on the
-workspace lockfile, both of which live above `apps/cms`. Pointing Appwrite at
-the subfolder would hide them from the install step.
+**Root directory must be `./`.** It is an upload boundary, not a `cd`: only
+that subtree is copied to the build executor. Point it at `./apps/cms` and the
+build never sees `pnpm-workspace.yaml`, the lockfile or `packages/schema`, so
+the `workspace:*` dependency cannot resolve.
 
-If `corepack` is unavailable in the build image, use
-`npm install -g pnpm@11 && pnpm install --frozen-lockfile --filter @workspace/cms...`
-as the install command instead. The `...` suffix installs the CMS *and* its
-workspace dependencies (the schema package) and nothing else - the Expo/React
-Native tree is never downloaded for a CMS build.
+**The install command must name pnpm.** The Next.js preset defaults to
+`npm install`, and npm cannot parse the `catalog:` protocol this workspace uses
+for `react`, `react-dom` and `typescript`. A default install fails with
+`Unsupported URL Type "catalog:"`. If `corepack` is unavailable in the build
+image, use `npm install -g pnpm@11 && pnpm install --frozen-lockfile --filter
+@workspace/cms...` instead. The `...` suffix installs the CMS *and* its
+workspace dependencies and nothing else, so the Expo tree is never downloaded.
 
-Environment variables (Sites → Settings → Environment variables), all of
-which `next build` needs at build time, not just at runtime:
+**The build command is not `next build`.** `pnpm build:cms:appwrite` runs the
+Turbo build and then `scripts/pack-cms-for-appwrite.mjs`, which reshapes the
+output. Appwrite starts a site by running `server.js` at the root of the output
+directory, but in a workspace Next writes its entry point to
+`apps/cms/server.js` inside the standalone tree (the traced paths are relative
+to `outputFileTracingRoot`). A build with no `server.js` where the runtime
+looks for it does not fail loudly - it hangs in FINALIZING until the build
+times out. The script also copies in `.next/static` and `public/`, which
+`next build` deliberately leaves out of standalone output, and deletes the
+local `.env` if one was picked up.
+
+Do not remove `output: "standalone"`, `outputFileTracingRoot` or
+`transpilePackages` from `apps/cms/next.config.ts`; each one is load-bearing
+for this pipeline.
+
+Environment variables (Sites → Settings → Environment variables). Next inlines
+`NEXT_PUBLIC_*` at build time, so a change to any of them needs a redeploy, not
+just a restart:
 
 ```
 NEXT_PUBLIC_APPWRITE_ENDPOINT
 NEXT_PUBLIC_APPWRITE_PROJECT_ID
 NEXT_PUBLIC_APPWRITE_PROJECT_NAME
-NEXT_PUBLIC_APP_URL              ← the site's own URL, e.g. https://cms.example.com
+NEXT_PUBLIC_APP_URL              ← the site's own URL, e.g. https://sure-win.appwrite.network
 APPWRITE_API_KEY                 ← mark as secret
 APPWRITE_DATABASE_ID
 APPWRITE_ASSETS_BUCKET_ID
@@ -46,13 +65,17 @@ APPWRITE_CMS_ADMIN_EMAILS
 GOOGLE_PLAY_*                    ← see apps/cms/.env.billing.example
 ```
 
+`NEXT_PUBLIC_APP_URL` must match the deployed domain exactly. OAuth builds its
+success and failure redirects from it (`app/api/auth/oauth/route.ts`), and
+Appwrite rejects a redirect to an unregistered origin - add the domain under
+**Auth → Settings → Hostnames** too, or sign-in fails with `oauth_redirect_invalid`.
+
+Do not define your own variables prefixed `APPWRITE_SITE_`; Appwrite injects
+that namespace and its values win.
+
 After the first deploy, set `EXPO_PUBLIC_CMS_BASE_URL` in the mobile app to
 the site's URL: that is how the app turns `/api/assets/<fileId>` paths into
 loadable images.
-
-`next.config.ts` pins `turbopack.root` and `outputFileTracingRoot` to the
-repository root so the traced server bundle includes the workspace
-`node_modules/.pnpm` store and `packages/schema`; do not remove those.
 
 ## Mobile → EAS Build / Expo
 
@@ -70,12 +93,12 @@ repository minus what `.easignore` (at the repository root) excludes, runs
 builds inside `apps/mobile`. `eas.json`, credentials and `app.json` stay in
 `apps/mobile`.
 
-**Requirement: one git repository at the root.** EAS uploads the git working
-tree it is standing in. Today `apps/mobile` still has its own `.git`, so from
-inside it EAS would upload only `apps/mobile` - without `packages/schema` or
-the root lockfile - and the build would fail on `@workspace/schema`. Finish the
-merge in `docs/monorepo-migration.md` (either option) before the first EAS
-build from this layout.
+**One git repository at the root.** EAS uploads the git working tree it is
+standing in, so a nested `.git` under `apps/mobile` would upload only that
+folder - without `packages/schema` or the root lockfile - and the build would
+fail on `@workspace/schema`. Both apps were flattened into the root repository
+(see `docs/monorepo-migration.md`), so this is satisfied; do not reintroduce a
+nested repository under `apps/`.
 
 Environment variables for the app are `EXPO_PUBLIC_*` and are baked into the
 JS bundle at build time. Keep them in `eas.json` `build.<profile>.env`, or in

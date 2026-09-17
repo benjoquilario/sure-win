@@ -13,6 +13,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "check": "turbo run check:boundaries check:pure typecheck lint",
+    "build:cms:appwrite": "turbo run build --filter=@workspace/cms && node scripts/pack-cms-for-appwrite.mjs",
     "check:boundaries": "node scripts/check-sdk-boundaries.mjs",
     "appwrite:bootstrap": "pnpm --filter @workspace/cms appwrite:bootstrap",
     "appwrite:inspect": "pnpm --filter @workspace/cms appwrite:inspect",

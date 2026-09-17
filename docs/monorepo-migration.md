@@ -2,9 +2,20 @@
 
 `apps/cms` and `apps/mobile` were moved here from two standalone repositories
 (`benjoquilario/cms-social-work-reviewer`, branch `main`, and
-`benjoquilario/social-work-reviewer`, branch `master`). Their `.git`
-directories were left in place so nothing was lost; the root has no repository
-yet. Pick one of the two options below.
+`benjoquilario/social-work-reviewer`, branch `master`).
+
+**Resolved 2026-09-17 with Option B.** The nested `.git` directories were
+removed and both apps committed as ordinary files. Until then the root repo had
+recorded them as gitlinks (mode `160000`) pointing at commits in the old
+remotes, with no `.gitmodules`: GitHub rendered them as submodule entries that
+would not open, none of the restructure work inside them could be staged, and
+an Appwrite or EAS build cloning the repo got two empty directories.
+
+The history is preserved on the original remotes, at the commits that were
+current when the split happened - `cms-social-work-reviewer` at `2c3ec3d` and
+`social-work-reviewer` at `6478056`.
+
+The two options below are kept for the record.
 
 ## Option A - keep both histories (recommended)
 
