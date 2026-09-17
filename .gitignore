@@ -59,3 +59,7 @@ yarn-error.log*
 
 # office temp lock files
 ~$*
+
+# stray binaries / data dumps that landed in the mobile assets folder
+*.exe
+*.dump
