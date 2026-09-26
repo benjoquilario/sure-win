@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Text } from "@/components/ui/text"
+
 import { ReportDetailField } from "./report-detail-field"
 import { ReportReasonList } from "./report-reason-list"
 

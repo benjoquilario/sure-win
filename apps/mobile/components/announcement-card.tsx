@@ -1,12 +1,8 @@
 import { memo } from "react"
 import { View } from "react-native"
 
-import {
-  formatAnnouncementDate,
-  type Announcement,
-} from "@/lib/announcements"
-import { withOpacity } from "@/lib/theme"
-import { useThemePalette } from "@/hooks/use-theme"
+import { formatAnnouncementDate, type Announcement } from "@/lib/announcements"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { MarkdownContent } from "@/components/ui/markdown-content"
@@ -39,26 +35,18 @@ export const AnnouncementCard = memo(function AnnouncementCard({
   announcement,
   isUnread,
 }: AnnouncementCardProps) {
-  const theme = useThemePalette()
   const audienceLabel = AUDIENCE_LABELS[announcement.audience]
 
   return (
-    <Card
-      style={
-        isUnread
-          ? { borderColor: withOpacity(theme.primary, 0.35) }
-          : undefined
-      }
-    >
+    <Card className={cn(isUnread && "border-primary/35")}>
       <CardContent className="gap-3">
         <View className="flex-row items-center justify-between gap-2">
-          <View className="flex-1 flex-row items-center gap-2">
+          <View className="min-w-0 flex-1 flex-row items-center gap-2">
             {isUnread ? (
               <View
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: theme.primary }}
+                className="h-2 w-2 rounded-full bg-primary"
               />
             ) : null}
 
@@ -69,7 +57,7 @@ export const AnnouncementCard = memo(function AnnouncementCard({
             ) : null}
           </View>
 
-          <Text variant="caption">
+          <Text variant="caption" numberOfLines={1} className="shrink-0">
             {formatAnnouncementDate(announcement.publishedAt)}
           </Text>
         </View>

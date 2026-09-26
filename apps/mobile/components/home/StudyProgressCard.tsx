@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ProgressBar } from "@/components/ui/progress-bar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
-
 import { MetricRow } from "@/components/study/metric-row"
 import { SectionLink } from "@/components/study/section-link"
 
@@ -47,8 +46,10 @@ export const StudyProgressCard = memo(function StudyProgressCard({
   return (
     <Card>
       <CardContent className="gap-3.5">
-        <View className="flex-row items-center justify-between">
-          <Text variant="subheading">Your Study Progress</Text>
+        <View className="flex-row items-center justify-between gap-3">
+          <Text variant="subheading" className="shrink" numberOfLines={1}>
+            Your Study Progress
+          </Text>
 
           <SectionLink
             theme={theme}

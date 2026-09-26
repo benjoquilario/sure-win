@@ -6,18 +6,21 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
-import { toContentViewer } from "@/lib/content/access"
 import type { QuestionnaireMode } from "@workspace/schema"
+
+import { toContentViewer } from "@/lib/content/access"
 import {
   listExamCategories,
   type ExamCategory,
 } from "@/lib/content/exam-categories"
+import { getGridCellStyle } from "@/lib/layout"
 import { queryKeys } from "@/lib/query-keys"
-import { ExamCategoryCard } from "@/components/exam/category-card"
+import { useContentPadding, useGridColumns } from "@/hooks/use-layout"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
+import { ExamCategoryCard } from "@/components/exam/category-card"
 
 /**
  * Every published exam category, straight from `exam_categories`.
@@ -26,8 +29,6 @@ import { Text } from "@/components/ui/text"
  * where a tap goes — a category with sets opens a picker, one without opens
  * its questions (section 2). No query is needed to find that out.
  */
-
-const LIST_CONTENT_STYLE = { paddingHorizontal: 16, paddingVertical: 16 }
 
 function CategoriesSkeleton() {
   return (
@@ -58,6 +59,10 @@ export default function BoardExamCategoriesScreen() {
   })
 
   const categories = categoriesQuery.data ?? []
+  // One column on a phone, two or three on a tablet or browser. Cards keep at
+  // least 320pt, which is where a category title still fits on two lines.
+  const columns = useGridColumns(320)
+  const contentPadding = useContentPadding()
 
   const openCategory = useCallback(
     (categoryId: string) => {
@@ -72,13 +77,15 @@ export default function BoardExamCategoriesScreen() {
   // Hoisted out of the list so FlashList is not handed a new function on every
   // render — a fresh reference re-renders every visible row.
   const renderCategory = useCallback(
-    ({ item }: ListRenderItemInfo<ExamCategory>) => (
-      <ExamCategoryCard
-        category={item}
-        onPress={() => openCategory(item.id)}
-      />
+    ({ item, index }: ListRenderItemInfo<ExamCategory>) => (
+      <View style={getGridCellStyle(index, columns)}>
+        <ExamCategoryCard
+          category={item}
+          onPress={() => openCategory(item.id)}
+        />
+      </View>
     ),
-    [openCategory]
+    [columns, openCategory]
   )
 
   const errorMessage =
@@ -105,10 +112,13 @@ export default function BoardExamCategoriesScreen() {
       />
 
       <FlashList
+        // FlashList cannot change its column count in place.
+        key={`categories-${columns}`}
+        numColumns={columns}
         data={categories}
         keyExtractor={(item) => item.id}
         renderItem={renderCategory}
-        contentContainerStyle={LIST_CONTENT_STYLE}
+        contentContainerStyle={{ ...contentPadding, paddingVertical: 16 }}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={ListSeparator}
         ListHeaderComponent={

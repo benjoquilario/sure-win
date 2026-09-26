@@ -1,57 +1,46 @@
-# Account Delete Function
+# account-delete
 
-This Appwrite Function handles permanent account deletion from the mobile app danger zone.
+Deletes the signed-in member's account and their data. Google Play will not
+accept a release without a working in-app deletion path, and this is it.
 
-## Purpose
+## What it removes
 
-- Accept the authenticated Appwrite user context
-- Delete user-owned data from the main reviewer collections
-- Delete the Appwrite Auth user using the server-side Users API
+Every row the member owns, in every member table: settings, study sessions,
+answers, progress, daily and weekly stats, achievements, bookmarks, blocks
+(both directions), announcement reads, likes, comments, replies, reports they
+filed, staff role, public profile and private profile. Their own forum posts
+go with every comment, reply and like on them. Then the Appwrite user.
 
-## Expected Environment Variables
+The profile row is removed last, so a failure part-way through leaves an
+account that can still sign in and retry.
 
-- `APPWRITE_API_ENDPOINT`
-- `APPWRITE_PROJECT_ID`
-- `APPWRITE_API_KEY`
-- `APPWRITE_DATABASE_ID`
-- `USER_PROFILES_COLLECTION_ID` (optional, defaults to `user_profiles`)
-- `USER_ROLES_COLLECTION_ID` (optional, defaults to `user_roles`)
-- `EXAM_ATTEMPTS_COLLECTION_ID` (optional, defaults to `exam_attempts`)
-- `USER_ANSWERS_COLLECTION_ID` (optional, defaults to `user_answers`)
-- `USER_PROGRESS_COLLECTION_ID` (optional, defaults to `user_progress`)
-- `POSTS_COLLECTION_ID` (optional, defaults to `posts`)
-- `COMMENTS_COLLECTION_ID` (optional, defaults to `comments`)
-- `REPLIES_COLLECTION_ID` (optional, defaults to `replies`)
-- `POST_LIKES_COLLECTION_ID` (optional, defaults to `post_likes`)
-- `COMMENT_LIKES_COLLECTION_ID` (optional, defaults to `comment_likes`)
-- `FLAGGED_CONTENT_COLLECTION_ID` (optional, defaults to `flagged_content`)
+## What it keeps
 
-## Invocation Shape
+`subscriptions`, `payments`, `billing_notifications` (financial records, kept
+for tax and chargeback disputes, which Play's policy allows) and
+`staff_activity` (the dashboard audit trail).
 
-Use `POST` with any JSON body. The function uses the authenticated Appwrite user id from the request headers.
+## Console settings
 
-Example body:
+- Runtime: Node 20 or later. Entrypoint `main.js`. Build command `npm install`.
+- Execute access: **Users**.
+- Scopes: `rows.read`, `rows.write`, `users.write`. The runtime key from those
+  scopes is used; `APPWRITE_API_KEY` is only a fallback.
+- Timeout: 60 seconds. A heavy forum user can have a lot of rows.
 
-```json
-{
-  "action": "delete-account"
-}
-```
+## Variables
 
-## Appwrite Console Settings
+`APPWRITE_DATABASE_ID` is required. Every table ID can be overridden with
+`<TABLE>_TABLE_ID` (for example `USER_ANSWERS_TABLE_ID`); the defaults are the
+schema's own IDs, so normally none are needed.
 
-- Trigger: `HTTP`
-- Execution method: `POST`
-- Path: `/`
-- Execute asynchronously: `false`
-- Entrypoint: `main.js`
+## App configuration
 
-## Mobile App Configuration
+Set `EXPO_PUBLIC_APPWRITE_ACCOUNT_DELETE_FUNCTION_ID` in the app's `.env` and
+in the EAS environment.
 
-Set this Expo public env var after deployment:
+## Adding a member table later
 
-- `EXPO_PUBLIC_APPWRITE_ACCOUNT_DELETE_FUNCTION_ID`
-
-## Best Practice Note
-
-This function deletes obvious user-owned data, then removes the Appwrite Auth user. If you later add more user-owned collections, extend this cleanup list before shipping.
+Add it to `OWNED_TABLES` in `src/main.js` before shipping. Every table with a
+`userId` column in `packages/schema/src/schema.ts` belongs there, except the
+ones listed under "What it keeps".

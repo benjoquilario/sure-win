@@ -1,13 +1,15 @@
 import { useCallback } from "react"
 import { useRouter } from "expo-router"
+import type { LucideIcon } from "lucide-react-native"
 import ClipboardCheck from "lucide-react-native/icons/clipboard-check"
 import GraduationCap from "lucide-react-native/icons/graduation-cap"
-import type { LucideIcon } from "lucide-react-native"
 import { Pressable, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { QuestionnaireMode } from "@workspace/schema"
+
 import { withOpacity } from "@/lib/theme"
+import { useContentPadding, useLayout } from "@/hooks/use-layout"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Card, CardContent } from "@/components/ui/card"
 import { Text } from "@/components/ui/text"
@@ -50,6 +52,11 @@ const MODES: ModeOption[] = [
 export default function ModeScreen() {
   const router = useRouter()
   const theme = useThemePalette()
+  const contentPadding = useContentPadding("reading")
+  // Two choices side by side once each can keep a comfortable card width;
+  // stacked, they push the second one below the fold on a landscape tablet.
+  const { frameWidth } = useLayout()
+  const sideBySide = frameWidth >= 600
 
   const openMode = useCallback(
     (mode: QuestionnaireMode) => {
@@ -62,7 +69,8 @@ export default function ModeScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="gap-4 px-4 pb-8 pt-1"
+        contentContainerClassName="gap-4 pb-8 pt-1"
+        contentContainerStyle={contentPadding}
       >
         <ScreenHeader title="Choose a mode" />
 
@@ -71,40 +79,48 @@ export default function ModeScreen() {
           asked — and when you find out how you did.
         </Text>
 
-        {MODES.map((option) => (
-          <Pressable
-            key={option.mode}
-            onPress={() => openMode(option.mode)}
-            accessibilityRole="button"
-            accessibilityLabel={`${option.title}. ${option.description}`}
-            className="active:opacity-90"
-          >
-            <Card>
-              <CardContent size="loose" className="gap-3">
-                <View
-                  className="h-12 w-12 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: withOpacity(theme.primary, 0.12) }}
-                >
-                  <option.Icon size={22} color={theme.primary} />
-                </View>
+        <View className={sideBySide ? "flex-row gap-4" : "gap-4"}>
+          {MODES.map((option) => (
+            <Pressable
+              key={option.mode}
+              onPress={() => openMode(option.mode)}
+              accessibilityRole="button"
+              accessibilityLabel={`${option.title}. ${option.description}`}
+              className={
+                sideBySide
+                  ? "flex-1 active:opacity-90 web:hover:opacity-95"
+                  : "active:opacity-90"
+              }
+            >
+              <Card>
+                <CardContent size="loose" className="gap-3">
+                  <View
+                    className="h-12 w-12 items-center justify-center rounded-lg"
+                    style={{
+                      backgroundColor: withOpacity(theme.primary, 0.12),
+                    }}
+                  >
+                    <option.Icon size={22} color={theme.primary} />
+                  </View>
 
-                <View className="gap-1">
-                  <Text variant="heading">{option.title}</Text>
-                  <Text variant="callout" className="text-muted-foreground">
-                    {option.description}
-                  </Text>
-                </View>
+                  <View className="gap-1">
+                    <Text variant="heading">{option.title}</Text>
+                    <Text variant="callout" className="text-muted-foreground">
+                      {option.description}
+                    </Text>
+                  </View>
 
-                <View
-                  className="rounded-md px-3 py-2.5"
-                  style={{ backgroundColor: withOpacity(theme.muted, 0.8) }}
-                >
-                  <Text variant="caption">{option.detail}</Text>
-                </View>
-              </CardContent>
-            </Card>
-          </Pressable>
-        ))}
+                  <View
+                    className="rounded-md px-3 py-2.5"
+                    style={{ backgroundColor: withOpacity(theme.muted, 0.8) }}
+                  >
+                    <Text variant="caption">{option.detail}</Text>
+                  </View>
+                </CardContent>
+              </Card>
+            </Pressable>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   )

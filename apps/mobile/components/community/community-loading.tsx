@@ -5,8 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 export function CommunityLoading() {
   return (
-    <View className="gap-4">
-      <Card className="overflow-hidden rounded-2xl py-0">
+    <View className="gap-3">
+      <Card>
         <CardContent className="gap-4">
           <View className="flex-row items-center gap-3">
             <Skeleton className="h-12 w-12 rounded-lg" />
@@ -27,7 +27,7 @@ export function CommunityLoading() {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden rounded-2xl py-0">
+      <Card>
         <CardContent className="gap-4">
           <View className="flex-row items-center gap-3">
             <Skeleton className="h-12 w-12 rounded-lg" />
@@ -39,7 +39,7 @@ export function CommunityLoading() {
           <Skeleton className="h-6 w-3/4 rounded-full" />
           <Skeleton className="h-4 w-full rounded-full" />
           <Skeleton className="h-4 w-4/5 rounded-full" />
-          <View className="rounded-xl border border-border bg-background px-4 py-3">
+          <View className="rounded-sm border border-border bg-background px-4 py-3">
             <Skeleton className="h-4 w-1/4 rounded-full" />
             <Skeleton className="mt-3 h-4 w-1/2 rounded-full" />
           </View>

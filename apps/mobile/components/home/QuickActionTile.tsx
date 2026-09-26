@@ -2,6 +2,7 @@ import { memo, type ComponentType } from "react"
 import { Pressable, View } from "react-native"
 
 import { withOpacity } from "@/lib/theme"
+import { cn } from "@/lib/utils"
 import { Text } from "@/components/ui/text"
 
 export type QuickActionIcon = ComponentType<{
@@ -16,6 +17,8 @@ type QuickActionTileProps = {
   /** Resolved palette colour — one of the chart hues, kept distinct per tile. */
   color: string
   onPress: () => void
+  /** Share the row equally instead of the fixed 64px phone tile. */
+  fill?: boolean
 }
 
 /**
@@ -31,6 +34,7 @@ export const QuickActionTile = memo(function QuickActionTile({
   label,
   color,
   onPress,
+  fill = false,
 }: QuickActionTileProps) {
   return (
     <Pressable
@@ -39,9 +43,17 @@ export const QuickActionTile = memo(function QuickActionTile({
       onPress={onPress}
       // 64px wide keeps five tiles on a 360px screen with the row's gaps, and
       // the 64px height clears the 44pt minimum target on its own.
-      className="w-16 items-center gap-2 active:opacity-75"
+      className={cn(
+        "items-center gap-2 active:opacity-75",
+        fill ? "min-w-0 flex-1" : "w-16"
+      )}
     >
-      <View className="h-16 w-16 items-center justify-center rounded-lg border border-border/70 bg-card">
+      <View
+        className={cn(
+          "h-16 items-center justify-center rounded-lg border border-border/70 bg-card web:hover:bg-muted/60",
+          fill ? "w-full" : "w-16"
+        )}
+      >
         <View
           className="h-9 w-9 items-center justify-center rounded-md"
           style={{ backgroundColor: withOpacity(color, 0.12) }}
@@ -53,7 +65,7 @@ export const QuickActionTile = memo(function QuickActionTile({
       <Text
         variant="caption"
         numberOfLines={2}
-        className="text-center text-[10px] leading-[13px] text-foreground"
+        className="text-center text-2xs text-foreground"
       >
         {label}
       </Text>

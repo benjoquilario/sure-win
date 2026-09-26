@@ -4,7 +4,7 @@ import ShieldCheck from "lucide-react-native/icons/shield-check"
 import { View } from "react-native"
 
 import type { Membership } from "@/lib/member/membership"
-import { withOpacity } from "@/lib/theme"
+import { cn } from "@/lib/utils"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -42,7 +42,6 @@ export const MembershipCard = memo(function MembershipCard({
 }: MembershipCardProps) {
   const theme = useThemePalette()
   const isPaid = membership.isPremium
-  const accent = isPaid ? theme.accentText : theme.mutedForeground
 
   return (
     <Card>
@@ -71,17 +70,14 @@ export const MembershipCard = memo(function MembershipCard({
         </View>
 
         {isPaid && membership.daysRemaining !== null ? (
-          <View
-            className="rounded-md px-3 py-2"
-            style={{ backgroundColor: withOpacity(accent, 0.1) }}
-          >
-            <Text variant="label" style={{ color: accent }}>
+          <View className="rounded-sm bg-accent/15 px-3 py-2">
+            <Text variant="label" className="text-accent-text">
               {membership.daysRemaining} days remaining
             </Text>
           </View>
         ) : null}
 
-        <View className="flex-row gap-2">
+        <View className="flex-row flex-wrap gap-2">
           {!isPaid ? (
             <Button size="sm" onPress={onUpgrade} className="flex-1">
               <Text>
@@ -95,7 +91,7 @@ export const MembershipCard = memo(function MembershipCard({
               size="sm"
               variant="outline"
               onPress={onManage}
-              className={isPaid ? "flex-1" : undefined}
+              className={cn(isPaid && "flex-1")}
             >
               <Text>Manage</Text>
             </Button>

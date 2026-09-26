@@ -18,27 +18,27 @@ import {
 } from "@/lib/community"
 import { prepareImageForUpload } from "@/lib/image-upload"
 import { listLearningSubjects } from "@/lib/learning-content"
-import { THEME } from "@/lib/theme"
-import { useColorScheme } from "@/hooks/use-color-scheme"
+import { getMemberByline } from "@/lib/member/profile"
+import { useCommunityModeration } from "@/hooks/use-community-moderation"
+import { useContentPadding } from "@/hooks/use-layout"
+import { useIsPremium } from "@/hooks/use-membership"
+import { useReport } from "@/hooks/use-report"
+import { useThemePalette } from "@/hooks/use-theme"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 import { CommunityComposerDialog } from "@/components/community/community-composer-dialog"
 import { CommunityFeedHeader } from "@/components/community/community-feed-header"
 import { CommunityLoading } from "@/components/community/community-loading"
-import { useIsPremium } from "@/hooks/use-membership"
-import { useCommunityModeration } from "@/hooks/use-community-moderation"
-import { useReport } from "@/hooks/use-report"
+import { CommunityThreadCard } from "@/components/community/community-thread-card"
 import {
   PostActionsMenu,
   type PostAction,
 } from "@/components/community/post-actions-menu"
-import { CommunityThreadCard } from "@/components/community/community-thread-card"
 import { ReportDialog } from "@/components/report"
-import { getMemberByline } from "@/lib/member/profile"
 
 function ThreadSeparator() {
-  return <View className="h-2 bg-muted/30" />
+  return <View className="h-3" />
 }
 
 function toCommunityAvatarSeed(name: string) {
@@ -59,8 +59,10 @@ export default function CommunityScreen() {
   const profile = useAuth((s) => s.profile)
   const isAuthenticated = useAuth((s) => s.isAuthenticated)
   const refreshProfile = useAuth((s) => s.refreshProfile)
-  const colorScheme = useColorScheme()
-  const theme = colorScheme === "dark" ? THEME.dark : THEME.light
+  const theme = useThemePalette()
+  // One column at the reading width: a thread is prose, and a feed of posts
+  // stretched across a desktop window is hard to follow line to line.
+  const contentPadding = useContentPadding("reading")
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
 
   // Zustand store
@@ -320,13 +322,16 @@ export default function CommunityScreen() {
 
   const emptyState = useMemo(
     () => (
-      <View className="items-center px-8 py-12">
-        <Text className="text-center text-sm text-muted-foreground">
-          {activeFeedFilter === "all"
-            ? "No discussions yet. Start the first thread!"
-            : `No ${activeFeedFilter} posts yet.`}
-        </Text>
-      </View>
+      <EmptyState
+        title={
+          activeFeedFilter === "all"
+            ? "No discussions yet"
+            : `No ${activeFeedFilter} posts yet`
+        }
+        description={
+          activeFeedFilter === "all" ? "Start the first thread!" : undefined
+        }
+      />
     ),
     [activeFeedFilter]
   )
@@ -358,10 +363,18 @@ export default function CommunityScreen() {
   }, [activeFeedFilter, hasMoreFeed, isLoadingMore, theme.primary])
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView
+      className="flex-1 bg-background"
+      edges={["top", "left", "right"]}
+    >
       {isLoading && !feed ? (
         <ScrollView
-          contentContainerClassName="gap-4 px-4 pb-8 pt-5"
+          contentContainerClassName="gap-3"
+          contentContainerStyle={{
+            ...contentPadding,
+            paddingTop: 16,
+            paddingBottom: 32,
+          }}
           contentInsetAdjustmentBehavior="automatic"
         >
           {header}
@@ -369,7 +382,12 @@ export default function CommunityScreen() {
         </ScrollView>
       ) : error && !feed ? (
         <ScrollView
-          contentContainerClassName="gap-4 px-4 pb-8 pt-5"
+          contentContainerClassName="gap-3"
+          contentContainerStyle={{
+            ...contentPadding,
+            paddingTop: 16,
+            paddingBottom: 32,
+          }}
           contentInsetAdjustmentBehavior="automatic"
         >
           {header}
@@ -389,9 +407,9 @@ export default function CommunityScreen() {
           ListEmptyComponent={emptyState}
           ListFooterComponent={footer}
           contentContainerStyle={{
-            paddingHorizontal: 16,
+            ...contentPadding,
             paddingTop: 16,
-            paddingBottom: 128,
+            paddingBottom: 32,
           }}
           ItemSeparatorComponent={ThreadSeparator}
           keyboardShouldPersistTaps="handled"

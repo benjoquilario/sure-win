@@ -1,0 +1,10 @@
+{
+  "name": "exam-questions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.js",
+  "type": "commonjs",
+  "dependencies": {
+    "node-appwrite": "^22.1.3"
+  }
+}

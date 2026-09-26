@@ -61,7 +61,11 @@ export const SessionFooter = memo(function SessionFooter({
     // `minInset` is generous here because this is the one bar a person taps
     // dozens of times in a row: the primary action should never sit within a
     // thumb's width of the system gesture pill.
-    <BottomBar minInset={16} className="flex-row items-center gap-3">
+    <BottomBar
+      minInset={16}
+      width="reading"
+      contentClassName="flex-row items-center gap-3"
+    >
       {/* Square rather than a text-sized button: an icon-only control in a
           `lg` slot is mostly padding, and a 56dp target is comfortably above
           the 44/48dp floor both platforms recommend. */}

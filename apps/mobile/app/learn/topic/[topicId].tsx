@@ -6,25 +6,28 @@ import { View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import {
+  describeMaterialType,
   getLearningTopicDetail,
   type LearningMaterial,
 } from "@/lib/learning-content"
-import { describeMaterialType } from "@/lib/learning-content"
 import { listLearningMaterialStatusesByTopic } from "@/lib/progress"
+import { useContentPadding } from "@/hooks/use-layout"
+import { useIsPremium } from "@/hooks/use-membership"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 import { MaterialRow } from "@/components/learn"
 import { ScreenHeader } from "@/components/screen-header"
-import { useIsPremium } from "@/hooks/use-membership"
 
 export default function TopicDetailScreen() {
   const router = useRouter()
   const theme = useThemePalette()
+  const contentPadding = useContentPadding("standard")
   const user = useAuth((state) => state.user)
   const isAuthenticated = useAuth((state) => state.isAuthenticated)
   const profile = useAuth((state) => state.profile)
@@ -105,11 +108,13 @@ export default function TopicDetailScreen() {
 
   if (topicQuery.isLoading) {
     return (
-      <SafeAreaView className="flex-1 gap-4 bg-background px-4 pt-3">
-        <Skeleton className="h-11 w-11 rounded-lg" />
-        <Skeleton className="h-20 rounded-xl" />
-        <Skeleton className="h-24 rounded-xl" />
-        <Skeleton className="h-56 rounded-xl" />
+      <SafeAreaView className="flex-1 bg-background">
+        <ContentFrame width="standard" className="gap-4 pt-3">
+          <Skeleton className="h-11 w-11 rounded-lg" />
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-56 rounded-xl" />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -117,7 +122,7 @@ export default function TopicDetailScreen() {
   if (topicQuery.error || !topicDetail) {
     return (
       <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 justify-center gap-4 px-4">
+        <ContentFrame width="reading" className="flex-1 justify-center">
           <EmptyState
             tone="destructive"
             title={topicQuery.error ? "Topic unavailable" : "Topic not found"}
@@ -132,21 +137,26 @@ export default function TopicDetailScreen() {
               </Button>
             }
           />
-        </View>
+        </ContentFrame>
       </SafeAreaView>
     )
   }
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* The header used to read "Topic" and carry three decorative icons
+          with no press handlers. It names the topic now. */}
+      <ScreenHeader title={topicDetail.topic.title} width="standard" />
+
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="gap-4 px-4 pb-10"
+        contentContainerClassName="gap-4"
+        contentContainerStyle={{
+          ...contentPadding,
+          paddingTop: 4,
+          paddingBottom: 40,
+        }}
       >
-        {/* The header used to read "Topic" and carry three decorative icons
-            with no press handlers. It names the topic now. */}
-        <ScreenHeader title={topicDetail.topic.title} />
-
         <View className="gap-1">
           <Text variant="eyebrow">{topicDetail.subject.name}</Text>
           {topicDetail.topic.description ? (
@@ -160,13 +170,13 @@ export default function TopicDetailScreen() {
           <Card>
             <CardContent size="compact" className="gap-2.5">
               <View className="flex-row items-end justify-between gap-3">
-                <View className="gap-0.5">
+                <View className="flex-1 gap-0.5">
                   <Text variant="label">Topic progress</Text>
                   <Text variant="callout" className="font-bold">
                     {completedCount} of {materials.length} completed
                   </Text>
                 </View>
-                <Text className="text-xl font-black text-primary">
+                <Text className="text-xl font-extrabold text-primary">
                   {completionPercent}%
                 </Text>
               </View>

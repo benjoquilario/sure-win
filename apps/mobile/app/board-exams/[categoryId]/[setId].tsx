@@ -1,12 +1,14 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { SafeAreaView } from "react-native-safe-area-context"
 
+import { DIRECT_SET_ID } from "@/lib/content/question-sets"
 import { useExamCategory, useQuestionSet } from "@/hooks/use-exam-content"
-import { PaperSetupScreen } from "@/components/exam/paper-setup-screen"
 import { Button } from "@/components/ui/button"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
+import { PaperSetupScreen } from "@/components/exam/paper-setup-screen"
 
 /**
  * One lettered set, ready to start.
@@ -22,25 +24,39 @@ export default function QuestionSetScreen() {
   }>()
 
   const categoryId = params.categoryId ?? ""
-  const setId = params.setId ?? ""
+  // "General" on the set picker: the questions directly under a category that
+  // also has sets. It is the no-set paper, reached through the picker.
+  const isDirect = params.setId === DIRECT_SET_ID
+  const setId = isDirect ? "" : (params.setId ?? "")
 
   const categoryQuery = useExamCategory(categoryId)
   const setQuery = useQuestionSet(setId)
 
   const category = categoryQuery.data ?? null
   const set = setQuery.data ?? null
-  const isLoading = categoryQuery.isLoading || setQuery.isLoading
+  const isLoading = categoryQuery.isLoading || (!isDirect && setQuery.isLoading)
 
   if (isLoading) {
     return (
       <SafeAreaView
         edges={["left", "right", "bottom"]}
-        className="flex-1 gap-3 bg-background px-4 py-4"
+        className="flex-1 bg-background py-4"
       >
         <Stack.Screen options={{ title: "Loading" }} />
-        <Skeleton className="h-24 rounded-xl" />
-        <Skeleton className="h-40 rounded-xl" />
+        <ContentFrame width="reading" className="gap-3">
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-40 rounded-xl" />
+        </ContentFrame>
       </SafeAreaView>
+    )
+  }
+
+  if (isDirect && category) {
+    return (
+      <>
+        <Stack.Screen options={{ title: `${category.title} · General` }} />
+        <PaperSetupScreen category={category} set={null} />
+      </>
     )
   }
 
@@ -50,23 +66,25 @@ export default function QuestionSetScreen() {
     return (
       <SafeAreaView
         edges={["left", "right", "bottom"]}
-        className="flex-1 bg-background px-4 py-4"
+        className="flex-1 bg-background py-4"
       >
         <Stack.Screen options={{ title: "Not found" }} />
-        <EmptyState
-          tone="destructive"
-          title="Set not found"
-          description="This set is no longer published, or it belongs to another category."
-          action={
-            <Button
-              size="sm"
-              variant="outline"
-              onPress={() => router.replace("/board-exams")}
-            >
-              <Text>Browse categories</Text>
-            </Button>
-          }
-        />
+        <ContentFrame width="reading">
+          <EmptyState
+            tone="destructive"
+            title="Set not found"
+            description="This set is no longer published, or it belongs to another category."
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => router.replace("/board-exams")}
+              >
+                <Text>Browse categories</Text>
+              </Button>
+            }
+          />
+        </ContentFrame>
       </SafeAreaView>
     )
   }

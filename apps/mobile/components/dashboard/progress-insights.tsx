@@ -1,20 +1,29 @@
 import { memo } from "react"
-import { View } from "react-native"
 import Award from "lucide-react-native/icons/award"
 import Flame from "lucide-react-native/icons/flame"
 import ShieldAlert from "lucide-react-native/icons/shield-alert"
 import TrendingDown from "lucide-react-native/icons/trending-down"
 import TrendingUp from "lucide-react-native/icons/trending-up"
+import { View } from "react-native"
+
 import type {
   AchievementHighlight,
   DashboardInsights,
   DashboardTrendSnapshot,
 } from "@/lib/performance-stats"
-import { THEME, withOpacity } from "@/lib/theme"
+import { withOpacity, type ThemePalette } from "@/lib/theme"
+import {
+  getToneColor,
+  TONE_SURFACE_CLASS,
+  TONE_TEXT_CLASS,
+  type Tone,
+} from "@/lib/tone"
+import { cn } from "@/lib/utils"
+import { useLayout } from "@/hooks/use-layout"
 import { Card, CardContent } from "@/components/ui/card"
+import { SectionHeader } from "@/components/ui/section-header"
+import { StatTile } from "@/components/ui/stat-tile"
 import { Text } from "@/components/ui/text"
-
-type ThemePalette = (typeof THEME)["light"] | (typeof THEME)["dark"]
 
 function formatAchievementDate(value: string) {
   try {
@@ -28,6 +37,10 @@ function formatAchievementDate(value: string) {
   }
 }
 
+function signed(value: number) {
+  return `${value >= 0 ? "+" : ""}${value}`
+}
+
 const TrendCard = memo(function TrendCard({
   snapshot,
   theme,
@@ -35,43 +48,43 @@ const TrendCard = memo(function TrendCard({
   snapshot: DashboardTrendSnapshot
   theme: ThemePalette
 }) {
-  const isPositive = snapshot.trend === "up"
-  const isNegative = snapshot.trend === "down"
-  const tone = isPositive
-    ? theme.success
-    : isNegative
-      ? theme.warning
-      : theme.primary
-  const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : Flame
+  const tone: Tone =
+    snapshot.trend === "up"
+      ? "success"
+      : snapshot.trend === "down"
+        ? "warning"
+        : "primary"
+  const toneColor = getToneColor(theme, tone)
+  const TrendIcon =
+    snapshot.trend === "up"
+      ? TrendingUp
+      : snapshot.trend === "down"
+        ? TrendingDown
+        : Flame
 
   return (
-    <Card className="flex-1" style={{ borderWidth: 1, borderColor: theme.border }}>
-      <CardContent size="compact" className="gap-2">
+    <Card className="flex-1">
+      <CardContent size="compact" className="gap-1.5">
         <View className="flex-row items-center justify-between gap-2">
-          <Text variant="eyebrow">
+          <Text variant="label" className="flex-1" numberOfLines={1}>
             {snapshot.label}
           </Text>
           <View
-            className="h-7 w-7 items-center justify-center rounded-sm"
-            style={{ backgroundColor: withOpacity(tone, 0.14) }}
+            className="h-7 w-7 items-center justify-center rounded-xs"
+            style={{ backgroundColor: withOpacity(toneColor, 0.14) }}
           >
-            <TrendIcon size={14} color={tone} />
+            <TrendIcon size={14} color={toneColor} />
           </View>
         </View>
-        <Text style={{ fontSize: 22, fontWeight: "900", color: theme.foreground }}>
+        <Text className="text-2xl font-extrabold text-foreground">
           {snapshot.currentAnsweredCount}
         </Text>
-        <Text className="text-2xs text-muted-foreground">
-          {snapshot.currentLabel} answered
-        </Text>
-        <Text className="text-2xs text-muted-foreground">
-          {snapshot.answeredDelta >= 0 ? "+" : ""}
-          {snapshot.answeredDelta} vs {snapshot.previousLabel}
-        </Text>
-        <Text className="text-2xs text-muted-foreground">
-          {snapshot.accuracyDelta >= 0 ? "+" : ""}
-          {snapshot.accuracyDelta}% accuracy, {snapshot.studyMinutesDelta >= 0 ? "+" : ""}
-          {snapshot.studyMinutesDelta} min
+        <Text variant="caption">
+          {snapshot.currentLabel} answered{"\n"}
+          {signed(snapshot.answeredDelta)} vs {snapshot.previousLabel}
+          {"\n"}
+          {signed(snapshot.accuracyDelta)}% accuracy,{" "}
+          {signed(snapshot.studyMinutesDelta)} min
         </Text>
       </CardContent>
     </Card>
@@ -89,23 +102,25 @@ const SubjectFocusRow = memo(function SubjectFocusRow({
   subjectName: string
   percent: number
   answered: number
-  tone: string
+  tone: Tone
 }) {
   return (
     <View
-      className="rounded-xl px-3.5 py-3"
-      style={{ backgroundColor: withOpacity(tone, 0.1) }}
+      className={cn(
+        "gap-0.5 rounded-sm border px-3.5 py-3",
+        TONE_SURFACE_CLASS[tone]
+      )}
     >
       <Text
-        className="text-2xs font-bold uppercase tracking-[1px]"
-        style={{ color: tone }}
+        className={cn(
+          "text-2xs font-bold uppercase tracking-[1px]",
+          TONE_TEXT_CLASS[tone]
+        )}
       >
         {label}
       </Text>
-      <Text className="mt-1 text-sm font-bold text-foreground">
-        {subjectName}
-      </Text>
-      <Text className="text-2xs text-muted-foreground">
+      <Text className="text-sm font-bold text-foreground">{subjectName}</Text>
+      <Text variant="caption">
         {percent}% accuracy across {answered} answers
       </Text>
     </View>
@@ -114,34 +129,43 @@ const SubjectFocusRow = memo(function SubjectFocusRow({
 
 const AchievementRow = memo(function AchievementRow({
   achievement,
-  theme,
   isLast,
 }: {
   achievement: AchievementHighlight
-  theme: ThemePalette
   isLast: boolean
 }) {
   return (
     <View
-      className="py-2.5"
-      style={{
-        borderBottomWidth: isLast ? 0 : 1,
-        borderBottomColor: withOpacity(theme.border, 0.5),
-      }}
+      className={cn("gap-0.5 py-2.5", !isLast && "border-b border-border/50")}
     >
-      <Text className="text-xs font-bold text-foreground">
+      <Text className="text-sm font-bold text-foreground">
         {achievement.title}
       </Text>
-      <Text className="mt-0.5 text-2xs leading-4 text-muted-foreground">
+      <Text variant="caption">
         {achievement.description ?? "Milestone unlocked"}
       </Text>
-      <Text variant="eyebrow" className="mt-1">
+      <Text variant="eyebrow" className="mt-0.5">
         {achievement.achievementType.replaceAll("_", " ")} -{" "}
         {formatAchievementDate(achievement.earnedAt)}
       </Text>
     </View>
   )
 })
+
+function InsightCardTitle({
+  icon,
+  title,
+}: {
+  icon: React.ReactNode
+  title: string
+}) {
+  return (
+    <View className="flex-row items-center gap-2">
+      {icon}
+      <Text variant="subheading">{title}</Text>
+    </View>
+  )
+}
 
 export const ProgressInsightsSection = memo(function ProgressInsightsSection({
   insights,
@@ -150,80 +174,56 @@ export const ProgressInsightsSection = memo(function ProgressInsightsSection({
   insights: DashboardInsights
   theme: ThemePalette
 }) {
+  const { isCompact } = useLayout()
   const strongest = insights.strongestSubject
   const weakest = insights.weakestSubject
 
   return (
-    <View className="gap-4">
-      <View className="gap-0.5">
-        <Text variant="eyebrow">
-          Review Insights
-        </Text>
-        <Text className="text-base font-extrabold text-foreground">
-          Momentum, focus, and achievements
-        </Text>
-      </View>
+    <View className="gap-3">
+      <SectionHeader
+        eyebrow="Review Insights"
+        title="Momentum, focus, and achievements"
+      />
 
-      <View className="gap-2.5">
+      {/* Side by side once a phone's width no longer squeezes the deltas. */}
+      <View className={isCompact ? "gap-3" : "flex-row gap-3"}>
         <TrendCard snapshot={insights.weekOverWeek} theme={theme} />
         <TrendCard snapshot={insights.monthOverMonth} theme={theme} />
       </View>
 
-      <Card style={{ borderWidth: 1, borderColor: theme.border }}>
+      <Card>
         <CardContent className="gap-3">
-          <View className="flex-row items-center gap-2">
-            <Flame size={15} color={theme.accent} />
-            <Text className="text-sm font-bold text-foreground">
-              Consistency Target
-            </Text>
-          </View>
-          <View className="flex-row gap-2.5">
-            <View
-              className="flex-1 rounded-xl px-3.5 py-3"
-              style={{ backgroundColor: withOpacity(theme.primary, 0.08) }}
-            >
-              <Text variant="eyebrow">
-                Active This Week
-              </Text>
-              <Text style={{ fontSize: 20, fontWeight: "900", color: theme.foreground }}>
-                {insights.consistency.currentWeekActiveDays}/
-                {insights.consistency.targetActiveDays}
-              </Text>
-              <Text className="text-2xs text-muted-foreground">
-                {insights.consistency.remainingDaysToGoal === 0
+          <InsightCardTitle
+            icon={<Flame size={16} color={theme.accentText} />}
+            title="Consistency Target"
+          />
+          <View className="flex-row flex-wrap gap-3">
+            <StatTile
+              style={{ flexBasis: "40%", flexGrow: 1 }}
+              label="Active This Week"
+              value={`${insights.consistency.currentWeekActiveDays}/${insights.consistency.targetActiveDays}`}
+              caption={
+                insights.consistency.remainingDaysToGoal === 0
                   ? "Weekly consistency goal reached"
-                  : `${insights.consistency.remainingDaysToGoal} more active day(s) to goal`}
-              </Text>
-            </View>
-            <View
-              className="flex-1 rounded-xl px-3.5 py-3"
-              style={{ backgroundColor: withOpacity(theme.accent, 0.1) }}
-            >
-              <Text
-                className="text-2xs font-bold uppercase tracking-[1px]"
-                style={{ color: theme.accent }}
-              >
-                Streak and Score
-              </Text>
-              <Text style={{ fontSize: 20, fontWeight: "900", color: theme.foreground }}>
-                {insights.consistency.currentStreak} days
-              </Text>
-              <Text className="text-2xs text-muted-foreground">
-                {Math.round(insights.consistency.weeklyAverageScore)}% weekly average
-              </Text>
-            </View>
+                  : `${insights.consistency.remainingDaysToGoal} more active day(s) to goal`
+              }
+            />
+            <StatTile
+              style={{ flexBasis: "40%", flexGrow: 1 }}
+              label="Streak and Score"
+              value={`${insights.consistency.currentStreak} days`}
+              caption={`${Math.round(insights.consistency.weeklyAverageScore)}% weekly average`}
+            />
           </View>
         </CardContent>
       </Card>
 
-      <Card style={{ borderWidth: 1, borderColor: theme.border }}>
+      <Card>
         <CardContent className="gap-3">
-          <View className="flex-row items-center gap-2">
-            <ShieldAlert size={15} color={theme.warning} />
-            <Text className="text-sm font-bold text-foreground">
-              Subject Focus
-            </Text>
-          </View>
+          <InsightCardTitle
+            icon={<ShieldAlert size={16} color={theme.accentText} />}
+            title="Subject Focus"
+          />
           <View className="gap-2.5">
             {strongest ? (
               <SubjectFocusRow
@@ -231,7 +231,7 @@ export const ProgressInsightsSection = memo(function ProgressInsightsSection({
                 subjectName={strongest.subjectName}
                 percent={strongest.correctPercent}
                 answered={strongest.totalAnswered}
-                tone={theme.success}
+                tone="success"
               />
             ) : null}
             {weakest ? (
@@ -240,40 +240,34 @@ export const ProgressInsightsSection = memo(function ProgressInsightsSection({
                 subjectName={weakest.subjectName}
                 percent={weakest.correctPercent}
                 answered={weakest.totalAnswered}
-                tone={theme.warning}
+                tone="warning"
               />
             ) : null}
-            {insights.focusSubjects.length > 0 ? (
-              <Text className="text-2xs leading-5 text-muted-foreground">
-                Focus next on {insights.focusSubjects.map((subject) => subject.subjectName).join(", ")} to raise your weakest areas faster.
-              </Text>
-            ) : (
-              <Text className="text-2xs leading-5 text-muted-foreground">
-                Keep answering more board exam questions to unlock subject-specific recommendations.
-              </Text>
-            )}
+            <Text variant="caption">
+              {insights.focusSubjects.length > 0
+                ? `Focus next on ${insights.focusSubjects.map((subject) => subject.subjectName).join(", ")} to raise your weakest areas faster.`
+                : "Keep answering more board exam questions to unlock subject-specific recommendations."}
+            </Text>
           </View>
         </CardContent>
       </Card>
 
-      <Card style={{ borderWidth: 1, borderColor: theme.border }}>
-        <CardContent className="gap-3">
-          <View className="flex-row items-center gap-2">
-            <Award size={15} color={theme.primary} />
-            <Text className="text-sm font-bold text-foreground">
-              Recent Achievements
-            </Text>
-          </View>
+      <Card>
+        <CardContent className="gap-1">
+          <InsightCardTitle
+            icon={<Award size={16} color={theme.primary} />}
+            title="Recent Achievements"
+          />
           {insights.recentAchievements.length === 0 ? (
-            <Text className="text-2xs leading-5 text-muted-foreground">
-              No achievements earned yet. Finish quizzes, stay consistent, and complete materials to start building your badge history.
+            <Text variant="caption" className="mt-2">
+              No achievements earned yet. Finish quizzes, stay consistent, and
+              complete materials to start building your badge history.
             </Text>
           ) : (
             insights.recentAchievements.map((achievement, index) => (
               <AchievementRow
                 key={achievement.id}
                 achievement={achievement}
-                theme={theme}
                 isLast={index === insights.recentAchievements.length - 1}
               />
             ))

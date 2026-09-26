@@ -4,13 +4,19 @@ import * as Haptics from "expo-haptics"
 import type { ExamCategory } from "@/lib/content/exam-categories"
 import type { QuestionSet } from "@/lib/content/question-sets"
 import type { ExamQuestion } from "@/lib/content/questions"
+import { listBookmarkedSkus } from "@/lib/member/bookmarks"
 import type { MemberProfile } from "@/lib/member/profile"
+import { getMemberTypeDisplay } from "@/lib/member/profile"
 import {
   isExplanationApplicable,
   resolveTimerSeconds,
   type MemberSettings,
 } from "@/lib/member/settings"
-import { recordAnswer } from "@/lib/session/answers"
+import {
+  listAnsweredSkus,
+  listIncorrectSkus,
+  recordAnswer,
+} from "@/lib/session/answers"
 import { completeStudySession } from "@/lib/session/complete"
 import {
   buildQuestionPool,
@@ -22,10 +28,10 @@ import {
   findResumableSession,
   saveSessionProgress,
   startStudySession,
+  type SessionPlan,
   type StudyMode,
   type StudySession,
 } from "@/lib/session/study-session"
-import { getMemberTypeDisplay } from "@/lib/member/profile"
 
 /**
  * ─── Running a sitting ────────────────────────────────────────────────────
@@ -47,12 +53,7 @@ import { getMemberTypeDisplay } from "@/lib/member/profile"
  */
 
 export type ExamSessionStatus =
-  | "idle"
-  | "preparing"
-  | "ready"
-  | "submitting"
-  | "complete"
-  | "error"
+  "idle" | "preparing" | "ready" | "submitting" | "complete" | "error"
 
 export type ExamSessionResult = {
   correctCount: number
@@ -83,6 +84,27 @@ export type UseExamSessionInput = {
 
 const CHECKPOINT_DELAY_MS = 1200
 
+/** The settings a resumed sitting was opened with, laid over today's. */
+function applyPlan(settings: MemberSettings, plan: SessionPlan | null) {
+  if (!plan) {
+    return settings
+  }
+
+  return {
+    ...settings,
+    ...(plan.questionSource ? { questionSource: plan.questionSource } : {}),
+    ...(plan.difficultyFilter
+      ? { difficultyFilter: plan.difficultyFilter }
+      : {}),
+    ...(plan.shuffleQuestions !== null
+      ? { shuffleQuestions: plan.shuffleQuestions }
+      : {}),
+    ...(plan.shuffleChoices !== null
+      ? { shuffleChoices: plan.shuffleChoices }
+      : {}),
+  }
+}
+
 export function useExamSession(input: UseExamSessionInput) {
   const {
     userId,
@@ -109,11 +131,15 @@ export function useExamSession(input: UseExamSessionInput) {
   const [startedAtMs, setStartedAtMs] = useState(() => Date.now())
   const [didResume, setDidResume] = useState(false)
   const [result, setResult] = useState<ExamSessionResult | null>(null)
+  // The resumed sitting's own time limit, which beats both the setup screen's
+  // choice and today's settings: it is the same sitting.
+  const [planTimerSeconds, setPlanTimerSeconds] = useState<number | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
   const hasSubmittedRef = useRef(false)
   const openedKeyRef = useRef<string | null>(null)
-  const answerStartRef = useRef(Date.now())
+  // Set when the sitting opens and on every move; 0 is never read.
+  const answerStartRef = useRef(0)
 
   // The sitting is re-opened when its identity changes, not on every render of
   // the same paper.
@@ -185,7 +211,47 @@ export function useExamSession(input: UseExamSessionInput) {
             label,
             mode,
             questionCount: 0,
+            plan: {
+              questionLimit: questionLimit ?? settings.questionsPerSession,
+              timeLimitSeconds:
+                typeof minutes === "number" && minutes > 0
+                  ? minutes * 60
+                  : null,
+              questionSource: settings.questionSource,
+              difficultyFilter: settings.difficultyFilter,
+              shuffleQuestions: settings.shuffleQuestions,
+              shuffleChoices: settings.shuffleChoices,
+            },
           }))
+
+        // A resume rebuilds with what the sitting was opened with, and with
+        // history as it stood before the sitting - its own answers excluded -
+        // so the pool comes out identical to the one the member started.
+        const poolSettings = existing
+          ? applyPlan(settings, existing.plan)
+          : settings
+        const poolLimit = existing?.plan?.questionLimit ?? questionLimit
+        let history = {
+          answered: answeredSkus,
+          incorrect: incorrectSkus,
+          bookmarked: bookmarkedSkus,
+        }
+
+        if (existing && poolSettings.questionSource !== "all") {
+          const scope = {
+            userId,
+            categoryId: category.id,
+            questionnaireId: set?.id || undefined,
+            excludeSessionId: existing.sessionId,
+          }
+          const [answered, incorrect, bookmarked] = await Promise.all([
+            listAnsweredSkus(scope),
+            listIncorrectSkus(scope),
+            listBookmarkedSkus({ userId, categoryId: category.id }),
+          ])
+
+          history = { answered, incorrect, bookmarked }
+        }
 
         if (cancelled) {
           return
@@ -195,12 +261,12 @@ export function useExamSession(input: UseExamSessionInput) {
         // sequence and the identical choice order.
         const built = buildQuestionPool({
           questions,
-          settings,
+          settings: poolSettings,
           seed: opened.sessionId,
-          answeredSkus,
-          incorrectSkus,
-          bookmarkedSkus,
-          questionLimit,
+          answeredSkus: history.answered,
+          incorrectSkus: history.incorrect,
+          bookmarkedSkus: history.bookmarked,
+          questionLimit: poolLimit,
         })
 
         const restored = existing
@@ -221,6 +287,7 @@ export function useExamSession(input: UseExamSessionInput) {
         setRevealed(restored?.revealedPositions ?? new Set())
         setActiveIndex(restored?.resumeIndex ?? 0)
         setDidResume(Boolean(existing))
+        setPlanTimerSeconds(existing?.plan?.timeLimitSeconds ?? null)
         // Resuming rewinds the clock by the time already spent, so the
         // countdown continues rather than restarting.
         setStartedAtMs(Date.now() - (existing?.durationSeconds ?? 0) * 1000)
@@ -262,12 +329,16 @@ export function useExamSession(input: UseExamSessionInput) {
   }, [answers, pool])
 
   const timerSeconds = useMemo(() => {
+    if (planTimerSeconds) {
+      return planTimerSeconds
+    }
+
     if (typeof minutes === "number" && minutes > 0) {
       return minutes * 60
     }
 
     return resolveTimerSeconds(settings, questionCount)
-  }, [minutes, questionCount, settings])
+  }, [minutes, planTimerSeconds, questionCount, settings])
 
   const endsAtMs = timerSeconds ? startedAtMs + timerSeconds * 1000 : null
 
@@ -350,7 +421,10 @@ export function useExamSession(input: UseExamSessionInput) {
 
   const goTo = useCallback(
     (index: number) => {
-      const clamped = Math.min(Math.max(index, 0), Math.max(questionCount - 1, 0))
+      const clamped = Math.min(
+        Math.max(index, 0),
+        Math.max(questionCount - 1, 0)
+      )
       setActiveIndex(clamped)
       answerStartRef.current = Date.now()
     },

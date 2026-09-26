@@ -36,6 +36,7 @@ import {
   getReviewerTableDefinition,
   getTableAccess,
   isReviewerTableKey,
+  roleCanPublishTable,
   roleCanUseTable,
   type CmsRole,
 } from "@workspace/schema";
@@ -247,6 +248,7 @@ export default async function TablePage({
                     <AddRecordSection
                       tableKey={tableKey}
                       relationOptionsPromise={relationOptionsPromise}
+                      canPublish={roleCanPublishTable(cmsUser.role, tableKey)}
                     />
                   )}
                 </Suspense>
@@ -355,13 +357,21 @@ export default async function TablePage({
 async function AddRecordSection({
   tableKey,
   relationOptionsPromise,
+  canPublish,
 }: {
   tableKey: TableKey;
   relationOptionsPromise: Promise<RelationOptions>;
+  canPublish: boolean;
 }) {
   const relationOptions = await relationOptionsPromise;
 
-  return <RecordDialog tableKey={tableKey} relationOptions={relationOptions} />;
+  return (
+    <RecordDialog
+      tableKey={tableKey}
+      relationOptions={relationOptions}
+      canPublish={canPublish}
+    />
+  );
 }
 
 /** Shows the steps card only while there is nothing in the table yet. */

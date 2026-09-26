@@ -13,51 +13,51 @@ import {
   getQuestionsAnsweredTimeline,
   type TimelineWindow,
 } from "@/lib/performance-stats"
-import { THEME } from "@/lib/theme"
-import { useColorScheme } from "@/hooks/use-color-scheme"
-import { Card, CardContent } from "@/components/ui/card"
+import { useContentPadding, useGridColumns } from "@/hooks/use-layout"
+import { useTheme } from "@/hooks/use-theme"
+import { EmptyState } from "@/components/ui/empty-state"
 import { FadeInView } from "@/components/ui/motion"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 import { ActivityMetricsSection } from "@/components/dashboard/activity-metrics"
 import { OverallPerformanceSection } from "@/components/dashboard/overall-performance"
 import { ProgressInsightsSection } from "@/components/dashboard/progress-insights"
 import { ScreenHeader } from "@/components/screen-header"
 
-type ThemePalette = (typeof THEME)["light"] | (typeof THEME)["dark"]
+/** Narrowest a dashboard column may get before the sections stack. */
+const SECTION_MIN_WIDTH = 340
 
 const DashboardUnauthenticatedState = memo(
-  function DashboardUnauthenticatedState({ theme }: { theme: ThemePalette }) {
+  function DashboardUnauthenticatedState() {
     return (
       <FadeInView delay={getStaggerDelay(0)}>
-        <Card
-          className="mx-4"
-          style={{ borderWidth: 1, borderColor: theme.border }}
-        >
-          <CardContent className="gap-1.5">
-            <Text className="text-sm font-bold text-card-foreground">
-              Sign in to view performance
-            </Text>
-            <Text className="text-xs leading-5 text-muted-foreground">
-              Your quiz performance and progress data appear after login.
-            </Text>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="Sign in to view performance"
+          description="Your quiz performance and progress data appear after login."
+        />
       </FadeInView>
     )
   }
 )
 
-const DashboardLoadingState = memo(function DashboardLoadingState() {
+const DashboardLoadingState = memo(function DashboardLoadingState({
+  isTwoUp,
+}: {
+  isTwoUp: boolean
+}) {
   return (
-    <View className="gap-3 px-4">
+    <View className="gap-3">
       <Skeleton className="h-56 rounded-xl" />
-      <View className="flex-row gap-2.5">
+      <View className="flex-row gap-3">
         <Skeleton className="h-24 flex-1 rounded-xl" />
         <Skeleton className="h-24 flex-1 rounded-xl" />
       </View>
-      <Skeleton className="h-64 rounded-xl" />
+      <View className={isTwoUp ? "flex-row gap-3" : "gap-3"}>
+        <Skeleton
+          className={isTwoUp ? "h-64 flex-1 rounded-xl" : "h-64 rounded-xl"}
+        />
+        {isTwoUp ? <Skeleton className="h-64 flex-1 rounded-xl" /> : null}
+      </View>
     </View>
   )
 })
@@ -65,9 +65,10 @@ const DashboardLoadingState = memo(function DashboardLoadingState() {
 export default function DashboardScreen() {
   const router = useRouter()
   const user = useAuth((state) => state.user)
-  const colorScheme = useColorScheme()
-  const isDark = colorScheme === "dark"
-  const theme = isDark ? THEME.dark : THEME.light
+  const { theme } = useTheme()
+  const contentPadding = useContentPadding("standard")
+  // Performance and insights sit side by side once both columns stay readable.
+  const isTwoUp = useGridColumns(SECTION_MIN_WIDTH, "standard", 2) > 1
 
   const [window, setWindow] = useState<TimelineWindow>("week")
   const [offset, setOffset] = useState(0)
@@ -135,33 +136,38 @@ export default function DashboardScreen() {
     reportMetricsQuery.isLoading ||
     insightsQuery.isLoading
 
+  const sectionStyle = isTwoUp ? { flex: 1 } : undefined
+
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader
+        title="Performance Dashboard"
+        width="standard"
+        onBack={() => {
+          if (router.canGoBack()) {
+            router.back()
+            return
+          }
+          router.replace("/(tabs)")
+        }}
+      />
+
       <ScrollView
-        contentContainerClassName="gap-5 pb-28"
+        contentContainerClassName="gap-6"
+        contentContainerStyle={{
+          ...contentPadding,
+          paddingTop: 4,
+          paddingBottom: 40,
+        }}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View className="px-4 pt-1">
-          <ScreenHeader
-            title="Performance Dashboard"
-            onBack={() => {
-              if (router.canGoBack()) {
-                router.back()
-                return
-              }
-              router.replace("/(tabs)")
-            }}
-          />
-        </View>
-
         {!user ? (
-          <DashboardUnauthenticatedState theme={theme} />
+          <DashboardUnauthenticatedState />
         ) : isLoadingContent ? (
-          <DashboardLoadingState />
+          <DashboardLoadingState isTwoUp={isTwoUp} />
         ) : (
-          <View className="gap-5 px-4">
+          <>
             <FadeInView delay={getStaggerDelay(0)}>
               <ActivityMetricsSection
                 timeline={timeline}
@@ -175,34 +181,37 @@ export default function DashboardScreen() {
                 onNext={handleNext}
                 onToday={handleToday}
                 theme={theme}
+                isWide={isTwoUp}
               />
             </FadeInView>
 
-            <FadeInView delay={getStaggerDelay(1)}>
-              {performanceQuery.isLoading ? (
-                <View className="gap-3">
-                  <Skeleton className="h-40 rounded-xl" />
-                  <Skeleton className="h-32 rounded-xl" />
-                </View>
-              ) : performanceStats ? (
-                <OverallPerformanceSection
-                  stats={performanceStats}
-                  theme={theme}
-                />
-              ) : null}
-            </FadeInView>
+            <View className={isTwoUp ? "flex-row items-start gap-5" : "gap-6"}>
+              <FadeInView delay={getStaggerDelay(1)} style={sectionStyle}>
+                {performanceQuery.isLoading ? (
+                  <View className="gap-3">
+                    <Skeleton className="h-40 rounded-xl" />
+                    <Skeleton className="h-32 rounded-xl" />
+                  </View>
+                ) : performanceStats ? (
+                  <OverallPerformanceSection
+                    stats={performanceStats}
+                    theme={theme}
+                  />
+                ) : null}
+              </FadeInView>
 
-            <FadeInView delay={getStaggerDelay(2)}>
-              {insightsQuery.isLoading ? (
-                <View className="gap-3">
-                  <Skeleton className="h-32 rounded-xl" />
-                  <Skeleton className="h-40 rounded-xl" />
-                </View>
-              ) : insights ? (
-                <ProgressInsightsSection insights={insights} theme={theme} />
-              ) : null}
-            </FadeInView>
-          </View>
+              <FadeInView delay={getStaggerDelay(2)} style={sectionStyle}>
+                {insightsQuery.isLoading ? (
+                  <View className="gap-3">
+                    <Skeleton className="h-32 rounded-xl" />
+                    <Skeleton className="h-40 rounded-xl" />
+                  </View>
+                ) : insights ? (
+                  <ProgressInsightsSection insights={insights} theme={theme} />
+                ) : null}
+              </FadeInView>
+            </View>
+          </>
         )}
       </ScrollView>
     </SafeAreaView>

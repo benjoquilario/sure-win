@@ -3,6 +3,7 @@ import Play from "lucide-react-native/icons/play"
 import { View } from "react-native"
 
 import type { ExamCategory } from "@/lib/content/exam-categories"
+import { resolvePaperRules } from "@/lib/content/paper-rules"
 import type { QuestionSet } from "@/lib/content/question-sets"
 import type {
   FeedbackTiming,
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Text } from "@/components/ui/text"
+
 import { PaywallNotice } from "./paywall-notice"
 import {
   buildLengthOptions,
@@ -65,13 +67,15 @@ export const SessionSetupPanel = memo(function SessionSetupPanel({
   onUpgrade,
 }: SessionSetupPanelProps) {
   const lengthOptions = useMemo(
-    () => buildLengthOptions(availableCount),
-    [availableCount]
+    () =>
+      buildLengthOptions(
+        availableCount,
+        resolvePaperRules(category, set).timeLimitMinutes
+      ),
+    [availableCount, category, set]
   )
 
-  const [lengthId, setLengthId] = useState(
-    () => lengthOptions[0]?.id ?? "full"
-  )
+  const [lengthId, setLengthId] = useState(() => lengthOptions[0]?.id ?? "full")
   const [feedbackTiming, setFeedbackTiming] = useState<FeedbackTiming>(
     settings.feedbackTiming
   )
@@ -157,7 +161,8 @@ export const SessionSetupPanel = memo(function SessionSetupPanel({
               size="xl"
               onPress={() =>
                 onStart({
-                  questionCount: selectedLength?.questionCount ?? availableCount,
+                  questionCount:
+                    selectedLength?.questionCount ?? availableCount,
                   minutes: selectedLength?.minutes ?? 0,
                   feedbackTiming,
                   questionSource,

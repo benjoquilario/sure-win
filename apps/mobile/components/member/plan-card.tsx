@@ -7,7 +7,7 @@ import {
   getMonthlyEquivalent,
   type SubscriptionPlan,
 } from "@/lib/member/plans"
-import { withOpacity } from "@/lib/theme"
+import { cn } from "@/lib/utils"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -36,25 +36,19 @@ export const PlanCard = memo(function PlanCard({
 }: PlanCardProps) {
   const theme = useThemePalette()
   const monthlyEquivalent = getMonthlyEquivalent(plan)
-  const accent = plan.isPopular ? theme.primary : theme.border
 
   return (
     <Card
-      style={{
-        borderColor: accent,
-        borderWidth: plan.isPopular ? 1.5 : 1,
-        backgroundColor: plan.isPopular
-          ? withOpacity(theme.primary, 0.06)
-          : theme.card,
-      }}
+      className={cn(plan.isPopular && "border-primary bg-primary/5")}
+      style={plan.isPopular ? { borderWidth: 1.5 } : undefined}
     >
       <CardContent className="gap-3">
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1 gap-1">
             <Text variant="label">{plan.name}</Text>
 
-            <View className="flex-row items-baseline gap-1.5">
-              <Text className="text-2xl font-black text-card-foreground">
+            <View className="flex-row flex-wrap items-baseline gap-x-1.5">
+              <Text className="text-2xl font-extrabold text-card-foreground">
                 {playPrice ?? plan.formattedPrice}
               </Text>
               <Text variant="caption">{describeBillingPeriod(plan)}</Text>
@@ -69,9 +63,15 @@ export const PlanCard = memo(function PlanCard({
           </View>
 
           <View className="items-end gap-1.5">
-            {plan.isPopular ? <Badge tone="primary" size="sm">Popular</Badge> : null}
+            {plan.isPopular ? (
+              <Badge tone="primary" size="sm">
+                Popular
+              </Badge>
+            ) : null}
             {savingPercent ? (
-              <Badge tone="success" size="sm">Save {savingPercent}%</Badge>
+              <Badge tone="success" size="sm">
+                Save {savingPercent}%
+              </Badge>
             ) : null}
           </View>
         </View>

@@ -1,16 +1,23 @@
 import { memo } from "react"
-import { View } from "react-native"
 import Clock from "lucide-react-native/icons/clock"
-import Info from "lucide-react-native/icons/info"
 import Target from "lucide-react-native/icons/target"
 import Zap from "lucide-react-native/icons/zap"
+import { View } from "react-native"
+
 import type { OverallPerformanceStats } from "@/lib/performance-stats"
-import { THEME, getThemeChartPalette, withOpacity } from "@/lib/theme"
+import {
+  getThemeChartPalette,
+  withOpacity,
+  type ThemePalette,
+} from "@/lib/theme"
+import { cn } from "@/lib/utils"
+import { useLayout } from "@/hooks/use-layout"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { CircularProgress } from "@/components/ui/circular-progress"
+import { SectionHeader } from "@/components/ui/section-header"
+import { StatTile } from "@/components/ui/stat-tile"
 import { Text } from "@/components/ui/text"
-
-type ThemePalette = (typeof THEME)["light"] | (typeof THEME)["dark"]
 
 const SubjectBreakdownRow = memo(function SubjectBreakdownRow({
   subjectName,
@@ -18,68 +25,52 @@ const SubjectBreakdownRow = memo(function SubjectBreakdownRow({
   label,
   colorIndex,
   theme,
+  isLast,
 }: {
   subjectName: string
   correctPercent: number
   label: "STRONGEST" | null
   colorIndex: number
   theme: ThemePalette
+  isLast: boolean
 }) {
   const chartPalette = getThemeChartPalette(theme)
   const barColor = chartPalette[colorIndex % chartPalette.length]
 
   return (
-    <View
-      style={{
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: withOpacity(theme.border, 0.4),
-      }}
-    >
+    <View className={cn("py-3.5", !isLast && "border-b border-border/40")}>
       <View className="flex-row items-center justify-between gap-3">
         <View className="flex-1 flex-row items-center gap-2.5">
-          <View style={{ width: 4, height: 24, borderRadius: 2, backgroundColor: barColor }} />
+          <View
+            className="h-6 w-1 rounded-full"
+            style={{ backgroundColor: barColor }}
+          />
           <Text
-            style={{ fontSize: 13, fontWeight: "600", color: theme.foreground, flex: 1 }}
+            className="flex-1 text-sm font-semibold text-foreground"
             numberOfLines={2}
           >
             {subjectName}
           </Text>
         </View>
-        <View style={{ alignItems: "flex-end", gap: 2 }}>
-          <Text style={{ fontSize: 16, fontWeight: "900", color: theme.foreground }}>
+        <View className="items-end gap-0.5">
+          <Text className="text-base font-extrabold text-foreground">
             {correctPercent}%
           </Text>
           {label ? (
-            <View
-              style={{
-                backgroundColor: withOpacity(theme.success, 0.12),
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ fontSize: 9, fontWeight: "800", letterSpacing: 0.6, color: theme.success }}>
-                {label}
-              </Text>
-            </View>
+            <Badge tone="success" size="sm">
+              {label === "STRONGEST" ? "Strongest" : label}
+            </Badge>
           ) : null}
         </View>
       </View>
 
       <View
-        style={{
-          height: 4,
-          borderRadius: 2,
-          backgroundColor: withOpacity(barColor, 0.12),
-          marginTop: 10,
-          marginLeft: 16,
-        }}
+        className="ml-4 mt-2.5 h-1 rounded-full"
+        style={{ backgroundColor: withOpacity(barColor, 0.12) }}
       >
         <View
+          className="h-1 rounded-full"
           style={{
-            height: 4,
-            borderRadius: 2,
             width: `${Math.min(correctPercent, 100)}%`,
             backgroundColor: barColor,
           }}
@@ -89,62 +80,64 @@ const SubjectBreakdownRow = memo(function SubjectBreakdownRow({
   )
 })
 
-const PerformanceHeader = memo(function PerformanceHeader({ theme }: { theme: ThemePalette }) {
+const RingStat = memo(function RingStat({
+  value,
+  total,
+  label,
+}: {
+  value: number
+  total: number
+  label: string
+}) {
   return (
-    <View className="gap-0.5">
-      <Text variant="eyebrow">
-        Performance Insights
-      </Text>
-      <View className="flex-row items-center gap-2">
-        <Text className="text-base font-extrabold text-foreground">
-          Overall Performance
+    <View>
+      <View className="flex-row flex-wrap items-baseline gap-x-1">
+        <Text className="text-2xl font-extrabold text-foreground">{value}</Text>
+        <Text className="text-sm font-medium text-muted-foreground">
+          of {total}
         </Text>
-        <Info size={14} color={theme.mutedForeground} />
       </View>
+      <Text variant="caption">{label}</Text>
     </View>
   )
 })
 
 const PerformanceRingCard = memo(function PerformanceRingCard({
-  stats, theme
+  stats,
+  theme,
 }: {
   stats: OverallPerformanceStats
   theme: ThemePalette
 }) {
+  const { isSmallPhone } = useLayout()
+
   return (
-    <Card style={{ borderWidth: 1, borderColor: theme.border }}>
+    <Card>
       <CardContent size="loose">
-        <View className="flex-row items-center gap-5">
+        <View
+          className={cn(
+            "flex-row items-center",
+            isSmallPhone ? "gap-4" : "gap-5"
+          )}
+        >
           <CircularProgress
             percent={stats.correctPercent}
-            size={130}
+            size={isSmallPhone ? 104 : 130}
             strokeWidth={10}
             trackColor={withOpacity(theme.primary, 0.1)}
             color={theme.success}
           />
           <View className="flex-1 gap-4">
-            <View>
-              <View className="flex-row items-baseline gap-1">
-                <Text style={{ fontSize: 22, fontWeight: "900", color: theme.foreground }}>
-                  {stats.uniqueQuestionsAnswered}
-                </Text>
-                <Text style={{ fontSize: 13, fontWeight: "500", color: theme.mutedForeground }}>
-                  of {stats.totalQuestions}
-                </Text>
-              </View>
-              <Text className="text-2xs text-muted-foreground">Unique Questions Answered</Text>
-            </View>
-            <View>
-              <View className="flex-row items-baseline gap-1">
-                <Text style={{ fontSize: 22, fontWeight: "900", color: theme.foreground }}>
-                  {stats.correctAnswers}
-                </Text>
-                <Text style={{ fontSize: 13, fontWeight: "500", color: theme.mutedForeground }}>
-                  of {stats.totalAnswered}
-                </Text>
-              </View>
-              <Text className="text-2xs text-muted-foreground">Correct Answers</Text>
-            </View>
+            <RingStat
+              value={stats.uniqueQuestionsAnswered}
+              total={stats.totalQuestions}
+              label="Unique Questions Answered"
+            />
+            <RingStat
+              value={stats.correctAnswers}
+              total={stats.totalAnswered}
+              label="Correct Answers"
+            />
           </View>
         </View>
       </CardContent>
@@ -153,7 +146,8 @@ const PerformanceRingCard = memo(function PerformanceRingCard({
 })
 
 const PerformanceQuickStats = memo(function PerformanceQuickStats({
-  stats, theme
+  stats,
+  theme,
 }: {
   stats: OverallPerformanceStats
   theme: ThemePalette
@@ -162,91 +156,80 @@ const PerformanceQuickStats = memo(function PerformanceQuickStats({
   const avgSeconds = stats.averageTimePerQuestion % 60
 
   return (
-    <View className="flex-row gap-2.5">
-      <Card className="flex-1" style={{ borderWidth: 1, borderColor: theme.border }}>
-        <CardContent size="compact" className="items-center gap-1.5">
-          <View
-            className="h-9 w-9 items-center justify-center rounded-sm"
-            style={{ backgroundColor: withOpacity(theme.primary, 0.12) }}
-          >
-            <Clock size={16} color={theme.primary} />
-          </View>
-          <Text style={{ fontSize: 17, fontWeight: "900", color: theme.foreground }}>
-            {avgMinutes}m {avgSeconds}s
-          </Text>
-          <Text className="text-center text-2xs leading-[14px] text-muted-foreground">
-            Avg. Time Per{"\n"}Question
-          </Text>
-        </CardContent>
-      </Card>
-
-      <Card className="flex-1" style={{ borderWidth: 1, borderColor: theme.border }}>
-        <CardContent size="compact" className="items-center gap-1.5">
-          <View
-            className="h-9 w-9 items-center justify-center rounded-sm"
-            style={{ backgroundColor: withOpacity(theme.accent, 0.12) }}
-          >
-            <Zap size={16} color={theme.accent} />
-          </View>
-          <Text style={{ fontSize: 17, fontWeight: "900", color: theme.foreground }}>
-            {stats.bestStreak}
-          </Text>
-          <Text className="text-center text-2xs leading-[14px] text-muted-foreground">
-            Most Correct{"\n"}In A Row
-          </Text>
-        </CardContent>
-      </Card>
+    <View className="flex-row gap-3">
+      <StatTile
+        className="flex-1"
+        icon={<Clock size={14} color={theme.primary} />}
+        label="Avg. Time"
+        value={`${avgMinutes}m ${avgSeconds}s`}
+        caption="per question"
+      />
+      <StatTile
+        className="flex-1"
+        icon={<Zap size={14} color={theme.accentText} />}
+        label="Best Streak"
+        value={String(stats.bestStreak)}
+        caption="correct in a row"
+      />
     </View>
   )
 })
 
-const PerformanceCategoryBreakdown = memo(function PerformanceCategoryBreakdown({
-  stats, theme
-}: {
-  stats: OverallPerformanceStats
-  theme: ThemePalette
-}) {
-  return (
-    <Card style={{ borderWidth: 1, borderColor: theme.border }}>
-      <CardContent>
-        <View className="mb-1 flex-row items-center gap-2">
-          <View
-            className="h-8 w-8 items-center justify-center rounded-sm"
-            style={{ backgroundColor: withOpacity(theme.chart4, 0.12) }}
-          >
-            <Target size={14} color={theme.chart4} />
+const PerformanceCategoryBreakdown = memo(
+  function PerformanceCategoryBreakdown({
+    stats,
+    theme,
+  }: {
+    stats: OverallPerformanceStats
+    theme: ThemePalette
+  }) {
+    return (
+      <Card>
+        <CardContent className="pb-1">
+          <View className="mb-1 flex-row items-center gap-2.5">
+            <View
+              className="h-8 w-8 items-center justify-center rounded-sm"
+              style={{ backgroundColor: withOpacity(theme.chart4, 0.12) }}
+            >
+              <Target size={14} color={theme.chart4} />
+            </View>
+            <Text variant="subheading">Category Breakdown</Text>
           </View>
-          <Text className="text-sm font-bold text-foreground">
-            Category Breakdown
-          </Text>
-        </View>
-        {stats.subjectBreakdown.map((subject, index) => (
-          <SubjectBreakdownRow
-            key={subject.subjectId}
-            subjectName={subject.subjectName}
-            correctPercent={subject.correctPercent}
-            label={subject.label}
-            colorIndex={index}
-            theme={theme}
-          />
-        ))}
-      </CardContent>
-    </Card>
-  )
-})
+          {stats.subjectBreakdown.map((subject, index) => (
+            <SubjectBreakdownRow
+              key={subject.subjectId}
+              subjectName={subject.subjectName}
+              correctPercent={subject.correctPercent}
+              label={subject.label}
+              colorIndex={index}
+              theme={theme}
+              isLast={index === stats.subjectBreakdown.length - 1}
+            />
+          ))}
+        </CardContent>
+      </Card>
+    )
+  }
+)
 
-export const OverallPerformanceSection = memo(function OverallPerformanceSection({
-  stats, theme
-}: {
-  stats: OverallPerformanceStats
-  theme: ThemePalette
-}) {
-  return (
-    <View className="gap-4">
-      <PerformanceHeader theme={theme} />
-      <PerformanceRingCard stats={stats} theme={theme} />
-      <PerformanceQuickStats stats={stats} theme={theme} />
-      <PerformanceCategoryBreakdown stats={stats} theme={theme} />
-    </View>
-  )
-})
+export const OverallPerformanceSection = memo(
+  function OverallPerformanceSection({
+    stats,
+    theme,
+  }: {
+    stats: OverallPerformanceStats
+    theme: ThemePalette
+  }) {
+    return (
+      <View className="gap-3">
+        <SectionHeader
+          eyebrow="Performance Insights"
+          title="Overall Performance"
+        />
+        <PerformanceRingCard stats={stats} theme={theme} />
+        <PerformanceQuickStats stats={stats} theme={theme} />
+        <PerformanceCategoryBreakdown stats={stats} theme={theme} />
+      </View>
+    )
+  }
+)

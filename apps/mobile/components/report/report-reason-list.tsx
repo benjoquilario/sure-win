@@ -2,6 +2,7 @@ import { memo } from "react"
 import { View } from "react-native"
 
 import type { ReportReason } from "@/lib/moderation"
+
 import { ReportReasonOption } from "./report-reason-option"
 
 /**

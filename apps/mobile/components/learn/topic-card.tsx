@@ -70,7 +70,7 @@ export const TopicCard = memo(function TopicCard({
               )}
             </View>
 
-            <View className="flex-1 gap-0.5">
+            <View className="min-w-0 flex-1 gap-0.5">
               <Text variant="callout" className="font-bold" numberOfLines={2}>
                 {topic.title}
               </Text>

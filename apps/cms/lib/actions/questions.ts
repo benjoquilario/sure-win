@@ -310,6 +310,7 @@ export async function saveQuestionAction(
 
   const question: ParsedQuestionRow = parsed.question;
   let savedId: string;
+  let savedOrder = question.order;
 
   try {
     const saved = await saveQuestionRecord(rowId, {
@@ -327,6 +328,8 @@ export async function saveQuestionAction(
     });
 
     savedId = saved.id || rowId || "";
+    // A question moved to another set is renumbered there.
+    savedOrder = saved.order ?? question.order;
   } catch (error) {
     return {
       status: "error",
@@ -338,7 +341,7 @@ export async function saveQuestionAction(
   await recordStaffActivity({
     actor: cmsUser,
     action: rowId ? "record_updated" : "record_created",
-    summary: `${rowId ? "Edited" : "Wrote"} question ${question.order}: ${question.prompt.slice(0, 120)}`,
+    summary: `${rowId ? "Edited" : "Wrote"} question ${savedOrder}: ${question.prompt.slice(0, 120)}`,
     targetTable: "questions",
     targetId: savedId,
   });

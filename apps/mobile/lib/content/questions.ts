@@ -1,12 +1,19 @@
-import { Query } from "../appwrite"
-import { assertContentConfigured, countRows, listAll, resolveCmsAssetUrl } from "../db"
 import {
   toChoiceLabel,
   type QuestionDifficulty,
   type QuestionDocument,
   type QuestionType,
 } from "@workspace/schema"
+
+import { Query } from "../appwrite"
+import {
+  assertContentConfigured,
+  countRows,
+  listAll,
+  resolveCmsAssetUrl,
+} from "../db"
 import { canOpenQuestion, type ContentViewer } from "./access"
+import { fetchPaperFromGateway, isGatewayConfigured } from "./exam-gateway"
 
 /**
  * ─── Questions ────────────────────────────────────────────────────────────
@@ -64,7 +71,7 @@ export function toExamQuestion(row: QuestionDocument): ExamQuestion {
     text: typeof text === "string" ? text.trim() : "",
   }))
 
-  const answerIndex = row.answerIndex ?? 0
+  const answerIndex = row.answerIndex ?? -1
 
   return {
     id: row.$id,
@@ -78,11 +85,48 @@ export function toExamQuestion(row: QuestionDocument): ExamQuestion {
     explanation: row.explanation?.trim() ?? "",
     imageUrl: resolveCmsAssetUrl(row.imageUrl),
     choices,
-    // Clamped so a bad import cannot mark every answer wrong.
-    answerIndex:
-      answerIndex >= 0 && answerIndex < choices.length ? answerIndex : 0,
+    // Left as stored. An out-of-range key is caught by `isGradableQuestion`
+    // and the item is dropped; clamping it to 0 used to grade a broken item
+    // as "A is correct", which is worse than not showing it.
+    answerIndex,
     isFree: row.isFree === true,
   }
+}
+
+/**
+ * Whether an item can be shown and scored at all.
+ *
+ * The CMS importer rejects every one of these, so a failure here means a row
+ * was edited around it (the console, a script). Such an item is withheld
+ * rather than served with a guessed answer key.
+ */
+export function isGradableQuestion(question: ExamQuestion) {
+  const filledChoices = question.choices.filter((choice) => choice.text).length
+
+  return (
+    question.prompt.trim().length > 0 &&
+    filledChoices >= 2 &&
+    question.answerIndex >= 0 &&
+    question.answerIndex < question.choices.length &&
+    Boolean(question.choices[question.answerIndex]?.text)
+  )
+}
+
+function toGradableQuestions(rows: QuestionDocument[]) {
+  const questions = rows.map(toExamQuestion)
+  const gradable = questions.filter(isGradableQuestion)
+
+  if (__DEV__ && gradable.length < questions.length) {
+    const skipped = questions
+      .filter((question) => !isGradableQuestion(question))
+      .map((question) => question.sku || question.id)
+
+    console.warn(
+      `[questions] Withheld ${skipped.length} malformed item(s): ${skipped.join(", ")}`
+    )
+  }
+
+  return gradable
 }
 
 export function isAnswerCorrect(question: ExamQuestion, choiceIndex: number) {
@@ -139,7 +183,7 @@ export async function listQuestionsInSet(
     { label: `questions in set ${setId}` }
   )
 
-  return rows.map(toExamQuestion)
+  return toGradableQuestions(rows)
 }
 
 /** How many items a paper holds in total, free and paid. */
@@ -187,7 +231,7 @@ export async function listDirectQuestions(
     { label: `direct questions in ${categoryId}` }
   )
 
-  return rows.map(toExamQuestion)
+  return toGradableQuestions(rows)
 }
 
 /** Everything in a category, sets included. */
@@ -211,7 +255,7 @@ export async function listQuestionsInCategory(
     { label: `questions in ${categoryId}` }
   )
 
-  return rows.map(toExamQuestion)
+  return toGradableQuestions(rows)
 }
 
 /**
@@ -225,6 +269,61 @@ export function countQuestionsInCategory(categoryId: string) {
   assertContentConfigured()
 
   return countRows("questions", [Query.equal("categoryId", categoryId)])
+}
+
+// ─── One paper ──────────────────────────────────────────────────────────────
+
+export type LoadedPaper = {
+  questions: ExamQuestion[]
+  /** Every item in the paper, including any withheld from this member. */
+  total: number
+  /**
+   * False when the member receives the free sample only. Decided by the
+   * server when the gateway is configured; by the app's own check otherwise.
+   */
+  entitled: boolean
+}
+
+/**
+ * The items for one paper, with the paywall applied.
+ *
+ * Through the exam-questions Function when it is configured, which decides
+ * entitlement and publish state on the server and never sends a withheld
+ * item. Without it, the table is read directly with the same `isFree` filter -
+ * the development path, which stops working once `questions` is server-only.
+ */
+export async function loadPaper(params: {
+  categoryId: string
+  setId: string | null
+  /** The app's own view of entitlement; used only on the direct path. */
+  freeOnly: boolean
+}): Promise<LoadedPaper> {
+  assertContentConfigured()
+
+  if (!params.categoryId) {
+    return { questions: [], total: 0, entitled: true }
+  }
+
+  if (isGatewayConfigured()) {
+    const paper = await fetchPaperFromGateway(params)
+
+    return {
+      questions: toGradableQuestions(paper.rows),
+      total: paper.total,
+      entitled: paper.entitled,
+    }
+  }
+
+  const [questions, total] = await Promise.all([
+    params.setId
+      ? listQuestionsInSet(params.setId, { freeOnly: params.freeOnly })
+      : listDirectQuestions(params.categoryId, { freeOnly: params.freeOnly }),
+    params.setId
+      ? countQuestionsInSet(params.setId)
+      : countDirectQuestions(params.categoryId),
+  ])
+
+  return { questions, total, entitled: !params.freeOnly }
 }
 
 // ─── Paywall ────────────────────────────────────────────────────────────────

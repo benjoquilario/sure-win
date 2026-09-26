@@ -313,7 +313,7 @@ export const cmsRoleDefinitions = {
     label: "Encoder",
     rank: 10,
     summary:
-      "Types and uploads questions and review material. Cannot publish, delete, or see anything about members.",
+      "Types and uploads questions and review material, which stays hidden from students until a moderator publishes it. Cannot publish, unpublish, delete, or see anything about members.",
     permissions: encoderPermissions,
   },
   moderator: {
@@ -2765,13 +2765,44 @@ export const reviewerCmsSchema = {
         description:
           "1 shows first in the app. Use 1, 2, 3... in the order students should meet them.",
       },
+      // --- Exam settings -------------------------------------------------------
+      //
+      // Optional, so every existing category stays valid and keeps behaving as
+      // it does today. Blank is not "none": it means "the app's default", and
+      // the app owns that default so it can be tuned without a data migration.
+      {
+        key: "timeLimitMinutes",
+        label: "Time limit (minutes)",
+        kind: "integer",
+        required: false,
+        min: 0,
+        max: 600,
+        placeholder: "Leave blank for 0.6 minutes per question",
+        description:
+          "Optional. How long a student gets for the whole paper. Leave it blank, or type 0, to use the app's standard pace of 0.6 minutes per question (60 minutes for 100 questions). Sets can override it.",
+      },
+      {
+        key: "passingScore",
+        label: "Passing score (%)",
+        kind: "integer",
+        required: false,
+        min: 1,
+        max: 100,
+        placeholder: "Leave blank for 75",
+        description:
+          "Optional. The percentage a student needs to pass. Leave it blank to use 75, the board exam's passing rate. Sets can override it.",
+      },
       {
         key: "isPublished",
         label: "Visible in the app",
         kind: "boolean",
         required: true,
-        defaultValue: true,
-        description: "Turn off to hide this area and its papers from students.",
+        // Off, like a set: a category an encoder has just created is empty,
+        // and publishing is a moderator's decision, not a side effect of
+        // saving. Existing rows keep whatever they already store.
+        defaultValue: false,
+        description:
+          "Off by default. Turn it on once the category has questions that have been checked; until then students do not see it or anything in it. Needs a moderator or admin.",
       },
     ],
     indexes: [
@@ -2871,6 +2902,31 @@ export const reviewerCmsSchema = {
         max: 9999,
         description: "1 shows first within its category.",
       },
+      // Same two settings as the category, and blank here means "whatever the
+      // category says" - so a category-wide change reaches every set that has
+      // not asked for something different.
+      {
+        key: "timeLimitMinutes",
+        label: "Time limit (minutes)",
+        kind: "integer",
+        required: false,
+        min: 0,
+        max: 600,
+        placeholder: "Leave blank to use the category's",
+        description:
+          "Optional. Only fill this in when this set needs a different time limit from its category. Leave it blank to use the category's.",
+      },
+      {
+        key: "passingScore",
+        label: "Passing score (%)",
+        kind: "integer",
+        required: false,
+        min: 1,
+        max: 100,
+        placeholder: "Leave blank to use the category's",
+        description:
+          "Optional. Only fill this in when this set needs a different passing score from its category. Leave it blank to use the category's.",
+      },
       {
         key: "isPublished",
         label: "Visible in the app",
@@ -2919,7 +2975,27 @@ export const reviewerCmsSchema = {
   }),
   questions: defineTable({
     tableId: "questions",
-    accessModel: "app_readonly",
+    // Not `app_readonly`, unlike every other content table, because this is the
+    // one that is paid for. Appwrite permissions are per table or per row and
+    // cannot say "readable where isFree is true, or where the reader has
+    // premium" - so a table any member could read handed the whole bank to
+    // anyone with a free account and the SDK, whatever the app showed.
+    //
+    // The mobile app now reads questions only through the `exam-questions`
+    // Appwrite Function (functions/exam-questions). It runs with its own API
+    // key, serves only published categories and sets, and strips premium items
+    // for members without an active subscription - the paywall enforced on the
+    // server, where it cannot be skipped. The CMS is unaffected: it reads with
+    // the server API key, which ignores table permissions.
+    //
+    // ROLLOUT ORDER MATTERS. Bootstrapping this change removes read("users")
+    // from the table, and any app build still reading it directly breaks the
+    // moment that happens:
+    //   1. Deploy functions/exam-questions and note its function id.
+    //   2. Set EXPO_PUBLIC_APPWRITE_EXAM_QUESTIONS_FUNCTION_ID and ship the app
+    //      build that reads through the function; wait for it to be adopted.
+    //   3. Only then run `pnpm appwrite:bootstrap` to apply `server_only`.
+    accessModel: "server_only",
     domain: "questions",
     name: "Questions",
     description:
@@ -3233,6 +3309,70 @@ export const reviewerCmsSchema = {
         max: 100000,
         description:
           "Where an unfinished session picks up, so Continue lands on the right question.",
+      },
+      // --- How the sitting was set up -------------------------------------------
+      //
+      // A copy of the settings the session started with, so Continue rebuilds
+      // the same paper: the same number of questions, the same clock, the same
+      // pool. Reading them from `user_settings` instead would resume a session
+      // under whatever the member has changed since, and "item 37" would then
+      // point at a different question. All optional, so sessions written
+      // before these existed stay valid; the app treats a missing one as "use
+      // the current setting".
+      //
+      // `questionSource` and `difficultyFilter` are plain strings even though
+      // `user_settings` stores the same values as enums. A session is a record
+      // of what happened, and a filter added to the app later must not need a
+      // schema change before a session that used it can be saved.
+      {
+        key: "questionLimit",
+        label: "Questions asked for",
+        kind: "integer",
+        required: false,
+        min: 0,
+        max: 100000,
+        description:
+          "How many questions the member chose for this sitting. 0 or blank means every question available.",
+      },
+      {
+        key: "timeLimitSeconds",
+        label: "Time limit",
+        kind: "integer",
+        required: false,
+        min: 0,
+        max: 86400,
+        description:
+          "The clock the sitting started with, in seconds. 0 or blank means untimed.",
+      },
+      {
+        key: "questionSource",
+        label: "Question pool",
+        kind: "string",
+        required: false,
+        size: 32,
+        description:
+          "Which questions were drawn: all, unanswered, incorrect, or bookmarked - the same values as the member's study settings.",
+      },
+      {
+        key: "difficultyFilter",
+        label: "Difficulty",
+        kind: "string",
+        required: false,
+        size: 32,
+        description:
+          "all, easy, medium, or hard - the same values as the member's study settings.",
+      },
+      {
+        key: "shuffleQuestions",
+        label: "Questions shuffled",
+        kind: "boolean",
+        required: false,
+      },
+      {
+        key: "shuffleChoices",
+        label: "Choices shuffled",
+        kind: "boolean",
+        required: false,
       },
     ],
     indexes: [
@@ -5767,6 +5907,42 @@ export function roleCanUseTable(
 ) {
   const permission = getTablePermission(tableKey, action);
   return permission !== null && roleHasPermission(role, permission);
+}
+
+/** Which permission publishes content in each domain that has any. */
+const domainPublishPermissions: Partial<
+  Record<CmsPermissionDomain, CmsPermission>
+> = {
+  content: "content.publish",
+  questions: "questions.publish",
+};
+
+/**
+ * The permission that turns a table's "Visible in the app" switch, or `null`
+ * when the table has no such switch.
+ *
+ * Separate from `edit` on purpose. An encoder may write a category, a set, or
+ * a topic; whether students see it yet is the checker's call, which is the
+ * difference between an encoder and a moderator. Only a *change* of
+ * visibility needs it - fixing a typo in something already live does not.
+ */
+export function getPublishPermission(
+  tableKey: ReviewerTableKey,
+): CmsPermission | null {
+  const fields = reviewerCmsSchema[tableKey]
+    .fields as readonly CmsFieldDefinition[];
+
+  if (!fields.some((field) => field.key === "isPublished")) {
+    return null;
+  }
+
+  return domainPublishPermissions[getTableDomain(tableKey)] ?? null;
+}
+
+/** True when `role` may change what students can see in this table. */
+export function roleCanPublishTable(role: CmsRole, tableKey: ReviewerTableKey) {
+  const permission = getPublishPermission(tableKey);
+  return permission === null || roleHasPermission(role, permission);
 }
 
 /** Tables a role may open, in schema order. Drives the sidebar. */

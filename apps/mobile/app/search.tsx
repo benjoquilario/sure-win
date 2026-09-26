@@ -6,9 +6,11 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { SearchResult } from "@/lib/content/search"
 import { MIN_SEARCH_LENGTH } from "@/lib/content/search"
-import { useThemePalette } from "@/hooks/use-theme"
+import { useContentPadding } from "@/hooks/use-layout"
 import { useSearch } from "@/hooks/use-search"
+import { useThemePalette } from "@/hooks/use-theme"
 import { Button } from "@/components/ui/button"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
 import { Text } from "@/components/ui/text"
@@ -41,7 +43,7 @@ function ResultSection({ title, results, onSelect }: SectionProps) {
 
   return (
     <View className="gap-1.5">
-      <Text variant="eyebrow" className="px-1">
+      <Text variant="eyebrow" className="px-1" role="heading">
         {title}
       </Text>
       <View className="gap-1.5">
@@ -61,6 +63,7 @@ export default function SearchScreen() {
   const router = useRouter()
   const theme = useThemePalette()
   const search = useSearch("all")
+  const contentPadding = useContentPadding("reading")
 
   /**
    * Where a hit goes.
@@ -95,9 +98,9 @@ export default function SearchScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View className="px-4">
-        <ScreenHeader title="Search" />
+      <ScreenHeader title="Search" width="reading" />
 
+      <ContentFrame width="reading">
         <View className="pb-3">
           <Input
             value={search.term}
@@ -115,10 +118,14 @@ export default function SearchScreen() {
             }
           />
         </View>
-      </View>
+      </ContentFrame>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingTop: 0, paddingBottom: 32 }}
+        contentContainerStyle={{
+          ...contentPadding,
+          paddingTop: 4,
+          paddingBottom: 32,
+        }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -189,6 +196,7 @@ export default function SearchScreen() {
               <Button
                 size="sm"
                 variant="outline"
+                className="self-center"
                 onPress={() => search.setIncludeLessonText(true)}
               >
                 <Text>Also search inside lesson text</Text>

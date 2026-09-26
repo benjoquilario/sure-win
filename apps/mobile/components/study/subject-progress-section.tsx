@@ -1,12 +1,13 @@
 import { memo } from "react"
+import type { LucideIcon } from "lucide-react-native"
 import { ScrollView, View } from "react-native"
 
 import type { ThemePalette } from "@/lib/theme"
+import { useLayout } from "@/hooks/use-layout"
 import { EmptyState } from "@/components/ui/empty-state"
+import { SectionHeader } from "@/components/ui/section-header"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Text } from "@/components/ui/text"
 
-import type { LucideIcon } from "lucide-react-native"
 import { SectionLink } from "./section-link"
 import { SubjectProgressCard } from "./subject-progress-card"
 
@@ -53,17 +54,21 @@ export const SubjectProgressSection = memo(function SubjectProgressSection({
   onPressItem,
   onPressSeeAll,
 }: SubjectProgressSectionProps) {
+  const { gutter } = useLayout()
+
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between">
-        <Text variant="heading">{title}</Text>
-        <SectionLink
-          theme={theme}
-          label={seeAllLabel}
-          accessibilityLabel="See all subjects"
-          onPress={onPressSeeAll}
-        />
-      </View>
+      <SectionHeader
+        title={title}
+        action={
+          <SectionLink
+            theme={theme}
+            label={seeAllLabel}
+            accessibilityLabel="See all subjects"
+            onPress={onPressSeeAll}
+          />
+        }
+      />
 
       {isLoading ? (
         <SubjectRailSkeleton />
@@ -82,8 +87,12 @@ export const SubjectProgressSection = memo(function SubjectProgressSection({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          className="-mx-4"
-          contentContainerClassName="gap-3 px-4"
+          // Bleeds by exactly the gutter, so the rail runs to the screen edge
+          // on a phone (12pt under 360pt, not a hardcoded 16 that overflows)
+          // and stays inside the content column where the padding is wider.
+          style={{ marginHorizontal: -gutter }}
+          contentContainerClassName="gap-3"
+          contentContainerStyle={{ paddingHorizontal: gutter }}
         >
           {items.map((item) => (
             <SubjectProgressCard

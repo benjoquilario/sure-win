@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { useAppPreferences, type ThemeMode } from "@/lib/app-preferences"
 import { APPWRITE_CONFIG } from "@/lib/appwrite"
 import type { MemberSettings } from "@/lib/member/settings"
+import { useContentPadding } from "@/hooks/use-layout"
 import { useMemberSettings } from "@/hooks/use-member-settings"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,6 +47,7 @@ import { StudyPreferencesSection } from "@/components/settings/study-preferences
 
 export default function SettingsScreen() {
   const router = useRouter()
+  const contentPadding = useContentPadding("reading")
 
   const { settings, isLoading, update } = useMemberSettings()
   const themeMode = useAppPreferences((state) => state.preferences.themeMode)
@@ -137,7 +139,10 @@ export default function SettingsScreen() {
 
   const handleChangePassword = useCallback(async () => {
     if (nextPassword !== confirmPassword) {
-      Alert.alert("Passwords do not match", "Confirm your new password exactly.")
+      Alert.alert(
+        "Passwords do not match",
+        "Confirm your new password exactly."
+      )
       return
     }
 
@@ -160,7 +165,13 @@ export default function SettingsScreen() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [changePassword, closeDialog, confirmPassword, currentPassword, nextPassword])
+  }, [
+    changePassword,
+    closeDialog,
+    confirmPassword,
+    currentPassword,
+    nextPassword,
+  ])
 
   const handleSendVerification = useCallback(async () => {
     try {
@@ -203,12 +214,17 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader title="Settings" width="reading" />
+
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="gap-4 px-4 pb-28 pt-2"
+        contentContainerClassName="gap-4"
+        contentContainerStyle={{
+          ...contentPadding,
+          paddingTop: 4,
+          paddingBottom: 40,
+        }}
       >
-        <ScreenHeader title="Settings" />
-
         {isLoading ? (
           <View className="gap-3">
             <Skeleton className="h-40 rounded-xl" />
@@ -309,9 +325,7 @@ export default function SettingsScreen() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Change password</DialogTitle>
-            <DialogDescription>
-              Use at least 8 characters.
-            </DialogDescription>
+            <DialogDescription>Use at least 8 characters.</DialogDescription>
           </DialogHeader>
 
           <View className="gap-3">

@@ -7,29 +7,31 @@ import ClipboardCheck from "lucide-react-native/icons/clipboard-check"
 import GraduationCap from "lucide-react-native/icons/graduation-cap"
 import History from "lucide-react-native/icons/rotate-ccw-clock"
 import Target from "lucide-react-native/icons/target"
+import { View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import { useAppPreferences } from "@/lib/app-preferences"
 import { getInitials } from "@/lib/auth"
 import { buildExamCountdown, parseExamDate } from "@/lib/exam-countdown"
+import { listLearningSubjects } from "@/lib/learning-content"
+import { getStaggerDelay } from "@/lib/motion"
+import { getUserActivityFeed } from "@/lib/progress"
 import {
   buildRecentActivityEntries,
   buildStudyProgressSummary,
   buildSubjectProgressItems,
   getGreetingSalutation,
 } from "@/lib/study-dashboard"
-import { listLearningSubjects } from "@/lib/learning-content"
-import { getStaggerDelay } from "@/lib/motion"
-import { getUserActivityFeed } from "@/lib/progress"
 import { getThemeChartPalette } from "@/lib/theme"
 import { useAnnouncements } from "@/hooks/use-announcements"
+import { useContentPadding, useGridColumns } from "@/hooks/use-layout"
+import { useIsPremium } from "@/hooks/use-membership"
 import { useResumableSessions } from "@/hooks/use-resumable-sessions"
 import { useThemePalette } from "@/hooks/use-theme"
 import { DatePickerDialog } from "@/components/ui/date-picker-dialog"
 import { FadeInView } from "@/components/ui/motion"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 import {
-  SubjectProgressSection,
   ExamCountdownCard,
   HomeGreeting,
   HomeTopBar,
@@ -37,10 +39,10 @@ import {
   RecentActivitySection,
   ResumeAnsweringSection,
   StudyProgressCard,
-  type SubjectRailItem,
+  SubjectProgressSection,
   type QuickAction,
+  type SubjectRailItem,
 } from "@/components/home"
-import { useIsPremium } from "@/hooks/use-membership"
 
 /** How many subjects the rail shows before deferring to the Learn tab. */
 const SUBJECT_PREVIEW_COUNT = 6
@@ -56,6 +58,12 @@ export default function ReviewerHomeScreen() {
   // Flag *and* date — the cached flag alone keeps a lapsed member premium
   // until a server sweep catches up (section 6).
   const isPremiumUser = useIsPremium()
+
+  const contentPadding = useContentPadding()
+  // The countdown and the progress card sit side by side once each can keep
+  // 340pt — a tablet or a browser, where stacking them leaves two short,
+  // very wide cards.
+  const pairHeroCards = useGridColumns(340) >= 2
 
   const examDate = useAppPreferences((state) => state.preferences.examDate)
   const setPreference = useAppPreferences((state) => state.setPreference)
@@ -119,18 +127,11 @@ export default function ReviewerHomeScreen() {
   // The dot and the list come from the same query, so the badge can never
   // light up for something the Updates screen will not show.
   const showNewsBadge = announcements.hasUnread
-  const countdown = useMemo(
-    () => buildExamCountdown(examDate),
-    [examDate]
-  )
+  const countdown = useMemo(() => buildExamCountdown(examDate), [examDate])
 
   const allSubjectItems = useMemo(
     () =>
-      buildSubjectProgressItems(
-        subjectsQuery.data ?? [],
-        activityFeed,
-        theme
-      ),
+      buildSubjectProgressItems(subjectsQuery.data ?? [], activityFeed, theme),
     [activityFeed, subjectsQuery.data, theme]
   )
 
@@ -281,9 +282,13 @@ export default function ReviewerHomeScreen() {
   // ─── Render ─────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView
+      className="flex-1 bg-background"
+      edges={["top", "left", "right"]}
+    >
       <ScrollView
-        contentContainerClassName="gap-6 px-4 pb-6 pt-1"
+        contentContainerClassName="gap-6 pt-1"
+        contentContainerStyle={{ ...contentPadding, paddingBottom: 32 }}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       >
@@ -303,26 +308,34 @@ export default function ReviewerHomeScreen() {
           <HomeGreeting firstName={firstName} salutation={salutation} />
         </FadeInView>
 
-        <FadeInView delay={getStaggerDelay(1)}>
-          <ExamCountdownCard
-            theme={theme}
-            countdown={countdown}
-            onPress={() => setIsExamPickerOpen(true)}
-          />
-        </FadeInView>
+        <View className={pairHeroCards ? "flex-row gap-5" : "gap-6"}>
+          <FadeInView
+            delay={getStaggerDelay(1)}
+            style={pairHeroCards ? { flex: 1 } : undefined}
+          >
+            <ExamCountdownCard
+              theme={theme}
+              countdown={countdown}
+              onPress={() => setIsExamPickerOpen(true)}
+            />
+          </FadeInView>
 
-        <FadeInView delay={getStaggerDelay(2)}>
-          <StudyProgressCard
-            theme={theme}
-            isLoading={activityQuery.isLoading || subjectsQuery.isLoading}
-            progressPercent={progressSummary.progressPercent}
-            topicsStudied={progressSummary.topicsStudied}
-            questionsSolved={progressSummary.questionsSolved}
-            averageScore={progressSummary.averageScore}
-            dayStreak={progressSummary.dayStreak}
-            onPressViewDetails={goToDashboard}
-          />
-        </FadeInView>
+          <FadeInView
+            delay={getStaggerDelay(2)}
+            style={pairHeroCards ? { flex: 1 } : undefined}
+          >
+            <StudyProgressCard
+              theme={theme}
+              isLoading={activityQuery.isLoading || subjectsQuery.isLoading}
+              progressPercent={progressSummary.progressPercent}
+              topicsStudied={progressSummary.topicsStudied}
+              questionsSolved={progressSummary.questionsSolved}
+              averageScore={progressSummary.averageScore}
+              dayStreak={progressSummary.dayStreak}
+              onPressViewDetails={goToDashboard}
+            />
+          </FadeInView>
+        </View>
 
         <FadeInView delay={getStaggerDelay(3)}>
           <QuickActionsSection actions={quickActions} />

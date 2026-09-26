@@ -97,7 +97,7 @@ export const HomeHeroSection = memo(function HomeHeroSection({
           tone="brand"
         />
 
-        <View className="flex-1 gap-0.5">
+        <View className="min-w-0 flex-1 gap-0.5">
           <Text variant="label" style={{ color: brand.mutedForeground }}>
             Welcome back
           </Text>
@@ -134,7 +134,7 @@ export const HomeHeroSection = memo(function HomeHeroSection({
 
       {/* Today's goal, with the mascot alongside it */}
       <View className="flex-row items-center gap-3">
-        <View className="flex-1 gap-2.5">
+        <View className="min-w-0 flex-1 gap-2.5">
           <View className="gap-0.5">
             <Text variant="label" style={{ color: brand.mutedForeground }}>
               Today&apos;s goal
@@ -182,7 +182,8 @@ export const HomeHeroSection = memo(function HomeHeroSection({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={actionLabel}
-        className="h-12 flex-row items-center justify-center gap-2 rounded-md bg-white active:opacity-90"
+        className="h-12 flex-row items-center justify-center gap-2 rounded-md active:opacity-90"
+        style={{ backgroundColor: brand.foreground }}
         onPress={onPressPrimaryAction}
       >
         <Play size={15} color={brand.gradientMid} fill={brand.gradientMid} />

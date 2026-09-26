@@ -64,12 +64,15 @@ and StatTile primitives already do this).
 
 ## 2. Layout conventions
 
-- **Screen padding:** `px-4` for screen content (auth screens use `px-6`).
+- **Screen padding:** never hardcoded on a screen container; use
+  `useContentPadding()` / `ContentFrame` (see §2a). Auth screens keep a 24pt
+  phone margin inside the reading column.
 - **Card content:** `px-4 py-4` (via `CardContent`).
 - **Vertical rhythm:** `gap-3` between cards in a list, `gap-5`/`gap-6` between
   sections.
-- **Radius scale:** `rounded-2xl` for cards/buttons/inputs, `rounded-xl` for
-  nested chips/tiles, `rounded-full` for pills and round buttons. Avoid new
+- **Radius scale:** follow the ramp in `tailwind.config.js`: `rounded-xl` (24)
+  for cards, `rounded-md` (16) for buttons/inputs/answer options, `rounded-sm`
+  (12) for rows nested in a card, `rounded-full` for pills and round buttons. Avoid new
   arbitrary values (`rounded-[27px]`); if a bracket value already exists in the
   file you're editing, prefer migrating it to the nearest step.
 - **Touch targets:** minimum 44×44 (`h-11 w-11`); 40px (`h-10 w-10`) only with
@@ -77,6 +80,44 @@ and StatTile primitives already do this).
 - **Safe area:** screens under a native Stack header should use
   `edges={["left", "right", "bottom"]}`; full-screen (headerless) screens use
   the default edges.
+
+## 2a. Responsive layout (every screen)
+
+The app runs on 320pt phones, large phones, tablets and desktop browsers.
+Tokens live in `lib/layout.ts`; hooks in `hooks/use-layout.ts`.
+
+| Window class | Width | Navigation | Content |
+|---|---|---|---|
+| compact | < 600 | docked bottom bar | one column, 16pt gutter (12pt under 360pt) |
+| medium | 600–1023 | bottom bar, capped at 640pt | 24pt gutter, card grids go to 2 columns |
+| expanded | ≥ 1024 | left rail (sidebar with labels from 1280) | 32pt gutter, capped width |
+
+Rules:
+
+1. **Never hardcode horizontal screen padding** (`px-4`, `paddingHorizontal: 16`)
+   on a screen's scroll/list container. Use the centred padding instead, which
+   is the gutter on a phone and grows into margin on wide screens:
+
+   ```tsx
+   const contentPadding = useContentPadding()          // "standard", 960pt max
+   <FlashList contentContainerStyle={{ ...contentPadding, paddingBottom: 32 }} />
+   <ScrollView contentContainerStyle={{ ...useContentPadding("reading") }} />
+   ```
+
+   Content widths: `reading` (720pt: question text, lessons, forms, auth),
+   `standard` (960pt: lists, dashboards), `wide` (1200pt: grids).
+2. Anything outside a list (pinned header, search bar, bottom action bar
+   content) goes in `<ContentFrame width="…">` so it lines up with the list.
+3. Card lists that read well side by side (categories, subjects, sets) use
+   `const columns = useGridColumns(320)` and `numColumns={columns}` on
+   FlashList, with a `key` that includes the column count.
+4. `useLayout()` gives `isSmallPhone` (< 360pt): drop decoration, shorten
+   labels, never shrink text below the type ramp.
+5. Text must survive system font scaling. Don't give text a fixed height;
+   cap multipliers only on dense chrome (`maxFontSizeMultiplier={1.3}` in the
+   tab bar and badges), never on body copy.
+6. Tab screens do not pad for the tab bar: it is docked, not floating, and
+   the navigator lays screens out above it.
 
 ## 3. Typography
 
@@ -94,7 +135,7 @@ Semantic roles — use the components, not ad-hoc classes:
 | Section eyebrow | `SectionHeader` `eyebrow` | 11px black uppercase, tracking 1.4 |
 | Card title | `CardTitle` | semibold |
 | Body | `Text` | 16px regular (or `text-sm`) |
-| Caption | `Text` `variant="muted"` or `text-[12px] text-muted-foreground` | |
+| Caption | `Text` `variant="muted"` or `text-xs text-muted-foreground` | |
 
 ## 4. Primitive catalog (`components/ui`)
 

@@ -47,6 +47,13 @@ export const APPWRITE_CONFIG = {
     process.env.EXPO_PUBLIC_APPWRITE_COMMUNITY_POST_LIKE_FUNCTION_ID ?? "",
   premiumMaterialAccessFunctionId:
     process.env.EXPO_PUBLIC_APPWRITE_PREMIUM_MATERIAL_FUNCTION_ID ?? "",
+  /**
+   * Serves the question bank (functions/exam-questions). Once `questions` is
+   * `server_only` this is the only way to read it, so the paywall and the
+   * publish state are enforced by the server rather than drawn by the app.
+   */
+  examQuestionsFunctionId:
+    process.env.EXPO_PUBLIC_APPWRITE_EXAM_QUESTIONS_FUNCTION_ID ?? "",
   accountDeleteFunctionId:
     process.env.EXPO_PUBLIC_APPWRITE_ACCOUNT_DELETE_FUNCTION_ID ?? "",
   platform: Platform.select({
@@ -109,7 +116,8 @@ const OPTIONAL_APPWRITE_RESOURCES: {
   {
     value: APPWRITE_CONFIG.cmsBaseUrl,
     envVar: "EXPO_PUBLIC_CMS_BASE_URL",
-    usedFor: "images and files uploaded through the CMS (they render blank without it)",
+    usedFor:
+      "images and files uploaded through the CMS (they render blank without it)",
   },
   {
     value: APPWRITE_CONFIG.communityPostLikeFunctionId,
@@ -120,6 +128,12 @@ const OPTIONAL_APPWRITE_RESOURCES: {
     value: APPWRITE_CONFIG.premiumMaterialAccessFunctionId,
     envVar: "EXPO_PUBLIC_APPWRITE_PREMIUM_MATERIAL_FUNCTION_ID",
     usedFor: "server-side premium material checks",
+  },
+  {
+    value: APPWRITE_CONFIG.examQuestionsFunctionId,
+    envVar: "EXPO_PUBLIC_APPWRITE_EXAM_QUESTIONS_FUNCTION_ID",
+    usedFor:
+      "questions (falls back to direct table reads, which stop working once the table is server-only)",
   },
   {
     value: APPWRITE_CONFIG.accountDeleteFunctionId,

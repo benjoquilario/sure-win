@@ -4,19 +4,10 @@ import { useQuery } from "@tanstack/react-query"
 
 import { toContentViewer } from "@/lib/content/access"
 import { getExamCategory } from "@/lib/content/exam-categories"
-import {
-  getQuestionSet,
-  listQuestionSets,
-} from "@/lib/content/question-sets"
-import {
-  applyQuestionPaywall,
-  countDirectQuestions,
-  countQuestionsInSet,
-  listDirectQuestions,
-  listQuestionsInSet,
-} from "@/lib/content/questions"
-import { queryKeys } from "@/lib/query-keys"
+import { getQuestionSet, listQuestionSets } from "@/lib/content/question-sets"
+import { loadPaper } from "@/lib/content/questions"
 import { listBookmarkedSkus } from "@/lib/member/bookmarks"
+import { queryKeys } from "@/lib/query-keys"
 import { listAnsweredSkus, listIncorrectSkus } from "@/lib/session/answers"
 import { findResumableSession } from "@/lib/session/study-session"
 
@@ -64,12 +55,11 @@ export function useQuestionSet(setId: string) {
  * `setId` of null means the questions sitting directly under the category —
  * which is the common shape, not the exception.
  *
- * When the member cannot open the category, the **server** is asked for the
- * free sample only. The previous version downloaded the whole paid paper and
- * filtered it in the render, which meant every answer key and explanation the
- * member had not paid for was on their device. The count of what they are
- * missing comes from a separate `total`, so the paywall can still say how much
- * is behind it without shipping any of it.
+ * With the exam-questions Function configured, the **server** decides what
+ * this member may see and never sends the rest, so the answer keys and
+ * explanations of a paper they have not paid for are never on the device.
+ * The count of what they are missing comes back as `total`, so the paywall can
+ * still say how much is behind it without shipping any of it.
  */
 export function useExamQuestions(params: {
   categoryId: string
@@ -86,47 +76,40 @@ export function useExamQuestions(params: {
       freeOnly,
     ],
     enabled: (params.enabled ?? true) && Boolean(params.categoryId),
-    queryFn: async () => {
-      const [questions, total] = await Promise.all([
-        params.setId
-          ? listQuestionsInSet(params.setId, { freeOnly })
-          : listDirectQuestions(params.categoryId, { freeOnly }),
-        // Only worth a request when something is actually being withheld.
-        freeOnly
-          ? params.setId
-            ? countQuestionsInSet(params.setId)
-            : countDirectQuestions(params.categoryId)
-          : Promise.resolve(0),
-      ])
-
-      return { questions, total }
-    },
+    queryFn: () =>
+      loadPaper({
+        categoryId: params.categoryId,
+        setId: params.setId,
+        freeOnly,
+      }),
     // A paper does not change mid-sitting; refetching it would rebuild the
     // pool underneath the member.
     staleTime: 10 * 60 * 1000,
   })
 
   const paywalled = useMemo(() => {
-    const questions = query.data?.questions ?? []
+    const paper = query.data
 
-    const result = applyQuestionPaywall(
-      questions,
-      { isPremium: params.isPremiumCategory },
-      viewer
-    )
-
-    if (!freeOnly) {
-      return result
+    if (!paper) {
+      return { visible: [], hiddenCount: 0, isSample: false }
     }
 
-    // The read was already narrowed, so `hiddenCount` has to come from the
-    // total rather than from what came back.
+    // Belt and braces for the direct path: a caller that asked for the whole
+    // paper while not entitled still cannot render a paid item.
+    const visible = paper.entitled
+      ? paper.questions
+      : paper.questions.filter((question) => question.isFree)
+
     return {
-      ...result,
-      hiddenCount: Math.max((query.data?.total ?? 0) - result.visible.length, 0),
-      isSample: true,
+      visible,
+      // Zero for an entitled member even if the total is higher: the gap is
+      // then malformed items the loader withheld, not something to sell.
+      hiddenCount: paper.entitled
+        ? 0
+        : Math.max(paper.total - visible.length, 0),
+      isSample: !paper.entitled,
     }
-  }, [freeOnly, params.isPremiumCategory, query.data, viewer])
+  }, [query.data])
 
   return { ...query, ...paywalled }
 }

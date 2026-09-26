@@ -38,7 +38,7 @@ export const MetricCell = memo(function MetricCell({
       <Text
         variant="caption"
         numberOfLines={2}
-        className="text-center text-[10px] leading-[13px]"
+        className="text-center text-2xs"
       >
         {label}
       </Text>

@@ -45,6 +45,7 @@ type RecordDialogProps = {
   tableKey: ReviewerTableKey;
   relationOptions?: CmsRelationOptionsMap;
   label?: string;
+  canPublish?: boolean;
 };
 
 /**
@@ -58,6 +59,7 @@ export function RecordDialog({
   tableKey,
   relationOptions,
   label,
+  canPublish = true,
 }: RecordDialogProps) {
   const definition = getReviewerTableDefinition(tableKey);
   const singular = toSingularLabel(definition.name);
@@ -81,6 +83,7 @@ export function RecordDialog({
             bare
             tableKey={tableKey}
             relationOptions={relationOptions}
+            canPublish={canPublish}
           />
         </DialogBody>
       </DialogContent>

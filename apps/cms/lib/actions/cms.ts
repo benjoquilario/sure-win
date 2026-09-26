@@ -17,6 +17,9 @@ import {
   syncContentCounts,
 } from "@/lib/appwrite/content";
 import {
+  countQuestionsInCategory,
+  countQuestionsInSet,
+  countSetsInCategory,
   generateExamCategoryCode,
   generateSetCode,
   nextSetCodeForCategory,
@@ -30,7 +33,9 @@ import {
   DEFAULT_ROLE,
   getReviewerTableDefinition,
   isReviewerTableKey,
+  getPublishPermission,
   normalizeSetCode,
+  roleHasPermission,
   toCmsRole,
   type CmsFieldDefinition,
   type ReviewerTableKey,
@@ -94,11 +99,48 @@ function parseFieldValue(
   }
 }
 
-function buildRecordPayload(tableKey: ReviewerTableKey, formData: FormData) {
+function buildRecordPayload(
+  tableKey: ReviewerTableKey,
+  formData: FormData,
+  rowId: string | null,
+) {
   const definition = getReviewerTableDefinition(tableKey);
   const payload: Record<string, unknown> = {};
 
-  for (const field of definition.fields) {
+  for (const field of definition.fields as readonly CmsFieldDefinition[]) {
+    // A read-only field is the system's to write - a counter, a set letter, a
+    // derived subject - so whatever the form sent back for it is ignored. The
+    // form used to echo these in hidden inputs, which meant saving a category
+    // wrote back whatever its question count was when the page was opened,
+    // quietly undoing any recount that ran in between.
+    if (field.readOnly) {
+      // The one thing a read-only field ever needs from a save: a required
+      // timestamp is stamped on create, and left alone afterwards.
+      if (!rowId && field.required && field.kind === "datetime") {
+        payload[field.key] = new Date().toISOString();
+      }
+
+      continue;
+    }
+
+    // An optional number with no default - a time limit, a passing score -
+    // uses blank to mean "the app's default". Parsing would turn blank into 0,
+    // which is out of range for a passing score; skipping it would make a
+    // value set earlier impossible to clear. Null does both jobs.
+    const isClearableNumber =
+      (field.kind === "integer" || field.kind === "float") &&
+      !field.required &&
+      field.defaultValue === undefined;
+
+    if (
+      isClearableNumber &&
+      formData.has(field.key) &&
+      !String(formData.get(field.key) ?? "").trim()
+    ) {
+      payload[field.key] = null;
+      continue;
+    }
+
     const parsedValue = parseFieldValue(
       field,
       formData.get(field.key),
@@ -171,16 +213,33 @@ async function applyGeneratedCodes(
   tableKey: ReviewerTableKey,
   payload: Record<string, unknown>,
   rowId: string | null,
+  existing: Record<string, unknown> | null,
 ) {
-  // The set letter is free text so it can go past Z, which means it also has to
-  // be tidied: "set f" and " f " are both F. Blank means "give me the next one".
+  // The set letter belongs to the server: the form never sends one (it is
+  // read-only), so a set keeps the letter it has for as long as it stays in
+  // its category, and gets the next free letter of wherever it lands - a new
+  // set, or an empty one moved to another category.
   if (tableKey === "questionnaires") {
     const categoryId = String(payload.categoryId ?? "").trim();
-    const typed = normalizeSetCode(String(payload.setCode ?? ""));
+    const previousCategoryId = String(existing?.categoryId ?? "").trim();
+    const staysPut = Boolean(existing) && categoryId === previousCategoryId;
+    const currentLetter = staysPut
+      ? normalizeSetCode(String(existing?.setCode ?? ""))
+      : "";
 
     payload.setCode =
-      typed ||
+      currentLetter ||
       (categoryId ? await nextSetCodeForCategory(categoryId, rowId ?? "") : "A");
+
+    // A moved set's short code still starts with its old category's code.
+    // Regenerate it - unless the editor typed a new one in the same save.
+    if (
+      existing &&
+      !staysPut &&
+      String(payload.code ?? "").trim() === String(existing.code ?? "").trim()
+    ) {
+      delete payload.code;
+    }
   }
 
   const code = String(payload.code ?? "").trim();
@@ -235,6 +294,72 @@ async function applyGeneratedCodes(
   return payload;
 }
 
+function pluralize(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function describeSet(row: Record<string, unknown> | null) {
+  const title = String(row?.title ?? "").trim();
+  const setCode = String(row?.setCode ?? "").trim();
+
+  return title || (setCode ? `Set ${setCode}` : "This set");
+}
+
+function describeCategory(row: Record<string, unknown> | null) {
+  const title = String(row?.title ?? "").trim();
+
+  return title ? `"${title}"` : "This category";
+}
+
+/**
+ * Why a category or set cannot be deleted yet, or null when it can.
+ *
+ * Refused rather than cascaded: one click on a set should not take a hundred
+ * encoded questions and their SKUs with it. Appwrite has no foreign keys, so
+ * the alternative - deleting just the parent - leaves questions pointing at a
+ * category or set that no longer exists, where nobody can find them.
+ */
+async function explainBlockedDelete(
+  tableKey: ReviewerTableKey,
+  rowId: string,
+  row: Record<string, unknown> | null,
+): Promise<string | null> {
+  try {
+    if (tableKey === "questionnaires") {
+      const questions = await countQuestionsInSet(rowId);
+
+      return questions
+        ? `${describeSet(row)} still has ${pluralize(questions, "question")}. Move or delete them first.`
+        : null;
+    }
+
+    if (tableKey === "exam_categories") {
+      const [sets, questions] = await Promise.all([
+        countSetsInCategory(rowId),
+        countQuestionsInCategory(rowId),
+      ]);
+
+      if (!sets && !questions) {
+        return null;
+      }
+
+      const contents = [
+        sets ? pluralize(sets, "set") : "",
+        questions ? pluralize(questions, "question") : "",
+      ]
+        .filter(Boolean)
+        .join(" and ");
+
+      return `${describeCategory(row)} still has ${contents}. Move or delete them first.`;
+    }
+
+    return null;
+  } catch {
+    // Fail closed: not knowing whether it is empty is not the same as empty.
+    return "Could not check whether it is empty, so nothing was deleted. Try again.";
+  }
+}
+
 export async function saveCmsRecord(formData: FormData) {
   if (!hasAppwriteServerEnv()) {
     redirect("/dashboard?error=Appwrite server credentials are not configured");
@@ -282,24 +407,99 @@ export async function saveCmsRecord(formData: FormData) {
       );
     }
   }
+  // `create`/`edit` let an encoder write the row; making it live for students
+  // is a separate call, which is the point of having someone check the work.
+  const publishPermission = getPublishPermission(tableKey);
+
+  // The stored row, for the checks that depend on what is changing rather than
+  // on what was sent: publishing, and moving a set between categories.
+  const existing =
+    resolvedRowId && publishPermission
+      ? await getCmsRow(tableKey, resolvedRowId)
+      : null;
+
+  const formPayload = buildRecordPayload(tableKey, formData, resolvedRowId);
+
+  // Only a change of visibility needs the publish permission, so an encoder can
+  // still fix a typo in a live category without being bounced. A new row
+  // counts as a change when it is created already visible. An unreadable
+  // stored row counts as unpublished, which errs towards asking.
+  if (publishPermission && typeof formPayload.isPublished === "boolean") {
+    const wasPublished = existing?.isPublished === true;
+    const changesVisibility = resolvedRowId
+      ? formPayload.isPublished !== wasPublished
+      : formPayload.isPublished;
+
+    if (
+      changesVisibility &&
+      !roleHasPermission(cmsUser.role, publishPermission)
+    ) {
+      const verb = formPayload.isPublished ? "publish" : "unpublish";
+
+      redirect(
+        `/dashboard/${tableKey}?error=${encodeURIComponent(
+          `Your role cannot ${verb} this. Save it with "Visible in the app" left as it was, and ask a moderator to ${verb} it.`,
+        )}`,
+      );
+    }
+  }
+
+  // A set with questions stays in its category. Moving it would leave every
+  // question's categoryId pointing at the old one - counted there, listed
+  // there, served under the wrong subject - while the set itself shows up
+  // somewhere else. An empty set has nothing to strand, so it may move.
+  const previousCategoryId =
+    tableKey === "questionnaires"
+      ? String(existing?.categoryId ?? "").trim()
+      : "";
+  const movedFromCategoryId =
+    previousCategoryId &&
+    previousCategoryId !== String(formPayload.categoryId ?? "").trim()
+      ? previousCategoryId
+      : "";
+
+  if (resolvedRowId && movedFromCategoryId) {
+    let questionsInSet: number | null;
+
+    try {
+      questionsInSet = await countQuestionsInSet(resolvedRowId);
+    } catch {
+      questionsInSet = null;
+    }
+
+    if (questionsInSet !== 0) {
+      redirect(
+        `/dashboard/questionnaires?error=${encodeURIComponent(
+          questionsInSet === null
+            ? "Could not check whether this set is empty, so it was not moved. Try again."
+            : `${describeSet(existing)} still has ${pluralize(
+                questionsInSet,
+                "question",
+              )}, so it cannot move to another category. Move or delete them first, or add a new set in the other category.`,
+        )}`,
+      );
+    }
+  }
+
   const payload = await applyContentDefaults(
     tableKey,
-    await applyGeneratedCodes(
-      tableKey,
-      buildRecordPayload(tableKey, formData),
-      resolvedRowId,
-    ),
+    await applyGeneratedCodes(tableKey, formPayload, resolvedRowId, existing),
     resolvedRowId,
   );
   const createdRow = await saveCmsRow(tableKey, resolvedRowId, payload);
 
   // Adding a set, or publishing one, changes the category's setCount - which is
-  // what tells the mobile app whether to open a set picker at all.
+  // what tells the mobile app whether to open a set picker at all. A set that
+  // moved changes two categories' counts.
   if (tableKey === "questionnaires") {
     const categoryId = String(payload.categoryId ?? "").trim();
 
     if (categoryId) {
       await syncCategoryRollups(categoryId);
+    }
+
+    if (movedFromCategoryId) {
+      await syncCategoryRollups(movedFromCategoryId);
     }
   }
 
@@ -381,10 +581,17 @@ export async function deleteCmsRecord(formData: FormData) {
   // Read the parents before the row is gone, so they can be recounted after.
   const doomed =
     tableKey === "questionnaires" ||
+    tableKey === "exam_categories" ||
     tableKey === "learning_materials" ||
     tableKey === "topics"
       ? await getCmsRow(tableKey, rowId)
       : null;
+
+  const blocked = await explainBlockedDelete(tableKey, rowId, doomed);
+
+  if (blocked) {
+    redirect(`/dashboard/${tableKey}?error=${encodeURIComponent(blocked)}`);
+  }
 
   await deleteCmsRow(tableKey, rowId);
 

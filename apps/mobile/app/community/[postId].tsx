@@ -20,24 +20,33 @@ import {
   type CommunityCommentItem,
   type CommunityReplyItem,
 } from "@/lib/community"
-import { ReportDialog } from "@/components/report"
+import { getMemberByline } from "@/lib/member/profile"
+import {
+  getCommunityCategoryColor,
+  withOpacity,
+  type ThemePalette,
+} from "@/lib/theme"
+import { cn } from "@/lib/utils"
 import { useCommunityModeration } from "@/hooks/use-community-moderation"
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset"
+import { useContentPadding } from "@/hooks/use-layout"
 import { useReport } from "@/hooks/use-report"
+import { useTheme } from "@/hooks/use-theme"
+import { Badge } from "@/components/ui/badge"
+import { BottomBar } from "@/components/ui/bottom-bar"
+import { Card, CardContent } from "@/components/ui/card"
+import { ContentFrame } from "@/components/ui/content-frame"
+import { EmptyState } from "@/components/ui/empty-state"
+import { IconButton } from "@/components/ui/icon-button"
+import { Text } from "@/components/ui/text"
+import { ScrollView } from "@/components/ui/virtualized-scroll-view"
+import { CommunityAvatar } from "@/components/community/avatar"
 import {
   PostActionsMenu,
   type PostAction,
 } from "@/components/community/post-actions-menu"
-import { getCommunityCategoryColor, THEME, withOpacity } from "@/lib/theme"
-import { useColorScheme } from "@/hooks/use-color-scheme"
-import { useKeyboardInset } from "@/hooks/use-keyboard-inset"
-import { Text } from "@/components/ui/text"
-import { ScrollView } from "@/components/ui/virtualized-scroll-view"
-import { CommunityAvatar } from "@/components/community/avatar"
-import { BottomBar } from "@/components/ui/bottom-bar"
+import { ReportDialog } from "@/components/report"
 import { ScreenHeader } from "@/components/screen-header"
-import { getMemberByline } from "@/lib/member/profile"
-
-type ThemePalette = (typeof THEME)["light"] | (typeof THEME)["dark"]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,11 +80,8 @@ const ReplyRow = memo(function ReplyRow({
         size="sm"
       />
       <View className="flex-1">
-        <View
-          className="rounded-xl bg-muted/50 px-3 py-2.5"
-          style={{ borderWidth: 1, borderColor: theme.border }}
-        >
-          <Text className="text-sm font-bold text-foreground">
+        <View className="rounded-md border border-border/70 bg-muted/50 px-3 py-2.5">
+          <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
             {reply.author.name}
           </Text>
           <Text className="mt-0.5 text-sm leading-5 text-muted-foreground">
@@ -128,23 +134,31 @@ const CommentRow = memo(function CommentRow({
           size="md"
         />
         <View className="flex-1">
-          <View
-            className="rounded-xl bg-muted/50 px-3.5 py-3"
-            style={{ borderWidth: 1, borderColor: theme.border }}
-          >
-            <Text className="text-sm font-bold text-foreground">
+          <View className="rounded-md border border-border/70 bg-muted/50 px-3.5 py-3">
+            <Text
+              className="text-sm font-bold text-foreground"
+              numberOfLines={1}
+            >
               {comment.author.name}
             </Text>
             <Text className="mt-0.5 text-sm leading-5 text-foreground">
               {comment.content}
             </Text>
           </View>
-          <View className="mt-1 flex-row items-center gap-4 px-3">
+          <View className="flex-row items-center gap-3 px-3">
             <Text className="text-2xs text-muted-foreground">
               {comment.createdAtLabel}
             </Text>
-            <Pressable onPress={toggleReplying} disabled={disabled}>
-              <Text className="text-2xs font-bold text-primary">Reply</Text>
+            <Pressable
+              role="button"
+              accessibilityLabel={`Reply to ${comment.author.name}`}
+              accessibilityState={{ expanded: isReplying }}
+              onPress={toggleReplying}
+              disabled={disabled}
+              hitSlop={6}
+              className="min-h-8 justify-center px-1 web:hover:opacity-80"
+            >
+              <Text className="text-xs font-bold text-primary">Reply</Text>
             </Pressable>
           </View>
         </View>
@@ -167,14 +181,16 @@ const CommentRow = memo(function CommentRow({
             returnKeyType="send"
             onSubmitEditing={submitReply}
           />
-          <Pressable
+          <IconButton
+            label="Send reply"
+            variant="default"
+            size="sm"
             onPress={submitReply}
             disabled={disabled || !replyDraft.trim()}
-            className="h-9 w-9 items-center justify-center rounded-full bg-primary"
-            style={{ opacity: replyDraft.trim() ? 1 : 0.4 }}
+            className={cn("rounded-full", !replyDraft.trim() && "opacity-40")}
           >
-            <Send size={14} color={theme.primaryForeground} />
-          </Pressable>
+            <Send size={16} color={theme.primaryForeground} />
+          </IconButton>
         </View>
       ) : null}
     </View>
@@ -186,9 +202,8 @@ const CommentRow = memo(function CommentRow({
 export default function CommunityDiscussionScreen() {
   const insets = useSafeAreaInsets()
   const keyboardInset = useKeyboardInset()
-  const colorScheme = useColorScheme()
-  const isDark = colorScheme === "dark"
-  const theme = isDark ? THEME.dark : THEME.light
+  const { theme } = useTheme()
+  const contentPadding = useContentPadding("reading")
   const user = useAuth((s) => s.user)
   const profile = useAuth((s) => s.profile)
 
@@ -299,14 +314,13 @@ export default function CommunityDiscussionScreen() {
   if (!post) {
     return (
       <SafeAreaView className="flex-1 bg-background">
-        <View className="px-4">
-          <ScreenHeader title="Discussion" />
-        </View>
-        <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-center text-muted-foreground">
-            This discussion is no longer available.
-          </Text>
-        </View>
+        <ScreenHeader title="Discussion" width="reading" />
+        <ContentFrame width="reading" className="flex-1 justify-center">
+          <EmptyState
+            title="Discussion unavailable"
+            description="This discussion is no longer available."
+          />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -319,14 +333,16 @@ export default function CommunityDiscussionScreen() {
         keyboardVerticalOffset={Math.max(insets.top, 12)}
       >
         {/* Header */}
-        <View className="border-b border-border/50 px-4">
-          <ScreenHeader title={`${post.author.name}'s Post`} />
+        <View className="border-b border-border/50">
+          <ScreenHeader title={`${post.author.name}'s Post`} width="reading" />
         </View>
 
         <ScrollView
           automaticallyAdjustKeyboardInsets
-          contentContainerClassName="pb-20"
+          contentContainerClassName="gap-2"
           contentContainerStyle={{
+            ...contentPadding,
+            paddingTop: 16,
             paddingBottom: Math.max(insets.bottom, 20) + 80,
           }}
           contentInsetAdjustmentBehavior="automatic"
@@ -335,11 +351,8 @@ export default function CommunityDiscussionScreen() {
           keyboardDismissMode="interactive"
         >
           {/* Post content */}
-          <View className="gap-3 px-4 pt-4">
-            <View
-              className="gap-3 rounded-xl bg-card px-3.5 py-3.5"
-              style={{ borderWidth: 1, borderColor: theme.border }}
-            >
+          <Card>
+            <CardContent size="compact" className="gap-3">
               {/* Author row */}
               <View className="flex-row items-center gap-3">
                 <CommunityAvatar
@@ -349,10 +362,13 @@ export default function CommunityDiscussionScreen() {
                   size="lg"
                 />
                 <View className="flex-1">
-                  <Text className="text-sm font-bold text-foreground">
+                  <Text
+                    className="text-sm font-bold text-foreground"
+                    numberOfLines={1}
+                  >
                     {post.author.name}
                   </Text>
-                  <View className="flex-row items-center gap-1.5">
+                  <View className="flex-row flex-wrap items-center gap-x-1.5 gap-y-1">
                     <Text className="text-xs text-muted-foreground">
                       {post.createdAtLabel}
                     </Text>
@@ -376,18 +392,14 @@ export default function CommunityDiscussionScreen() {
 
               {/* Subject tag */}
               {post.subjectName ? (
-                <View
-                  className="self-start rounded-full px-3 py-1"
-                  style={{ backgroundColor: withOpacity(theme.primary, 0.08) }}
-                >
-                  <Text className="text-2xs font-bold text-primary">
-                    {post.subjectName}
-                  </Text>
-                </View>
+                <Badge tone="primary">{post.subjectName}</Badge>
               ) : null}
 
               {/* Title & content */}
-              <Text className="text-lg font-black leading-6 text-foreground">
+              <Text
+                role="heading"
+                className="text-lg font-extrabold text-foreground"
+              >
                 {post.title}
               </Text>
               <Text className="text-sm leading-6 text-foreground/80">
@@ -396,10 +408,7 @@ export default function CommunityDiscussionScreen() {
 
               {/* Photo */}
               {post.photoUrl ? (
-                <View
-                  className="overflow-hidden rounded-xl"
-                  style={{ borderWidth: 1, borderColor: theme.border }}
-                >
+                <View className="overflow-hidden rounded-md border border-border/70">
                   <Image
                     source={{ uri: post.photoUrl }}
                     style={{
@@ -414,21 +423,9 @@ export default function CommunityDiscussionScreen() {
               ) : null}
 
               {/* Engagement stats */}
-              <View
-                className="flex-row items-center justify-between py-2.5"
-                style={{
-                  borderTopWidth: 1,
-                  borderBottomWidth: 1,
-                  borderColor: theme.border,
-                }}
-              >
+              <View className="flex-row flex-wrap items-center justify-between gap-2 border-y border-border/70 py-2.5">
                 <View className="flex-row items-center gap-1.5">
-                  <View
-                    className="h-5 w-5 items-center justify-center rounded-full"
-                    style={{
-                      backgroundColor: withOpacity(theme.primary, 0.15),
-                    }}
-                  >
+                  <View className="h-5 w-5 items-center justify-center rounded-full bg-primary/15">
                     <Heart size={10} color={theme.primary} />
                   </View>
                   <Text className="text-xs text-muted-foreground">
@@ -443,7 +440,9 @@ export default function CommunityDiscussionScreen() {
               {/* Action buttons */}
               <View className="flex-row pb-1">
                 <Pressable
-                  className="flex-1 flex-row items-center justify-center gap-2 py-1.5"
+                  role="button"
+                  accessibilityState={{ selected: post.isLiked }}
+                  className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-sm active:bg-muted/60 web:hover:bg-muted/60"
                   onPress={handleToggleLike}
                   disabled={togglingLikePostId === post.id}
                 >
@@ -453,24 +452,22 @@ export default function CommunityDiscussionScreen() {
                     fill={post.isLiked ? theme.primary : "transparent"}
                   />
                   <Text
-                    className="text-sm font-semibold"
-                    style={{
-                      color: post.isLiked
-                        ? theme.primary
-                        : theme.mutedForeground,
-                    }}
+                    className={cn(
+                      "text-sm font-semibold",
+                      post.isLiked ? "text-primary" : "text-muted-foreground"
+                    )}
                   >
                     Like
                   </Text>
                 </Pressable>
-                <Pressable className="flex-1 flex-row items-center justify-center gap-2 py-1.5">
+                <Pressable className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-sm">
                   <MessageSquare size={18} color={theme.mutedForeground} />
                   <Text className="text-sm font-semibold text-muted-foreground">
                     Comment
                   </Text>
                 </Pressable>
                 <Pressable
-                  className="flex-1 flex-row items-center justify-center gap-2 py-1.5"
+                  className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-sm active:bg-muted/60 web:hover:bg-muted/60"
                   onPress={() => setIsActionsOpen(true)}
                   accessibilityRole="button"
                   accessibilityLabel="More actions for this post"
@@ -481,17 +478,18 @@ export default function CommunityDiscussionScreen() {
                   </Text>
                 </Pressable>
               </View>
-            </View>
-          </View>
+            </CardContent>
+          </Card>
 
           {/* Comments section */}
-          <View className="px-4 pt-2">
+          <View>
             {post.comments.length === 0 ? (
-              <View className="items-center py-8">
-                <Text className="text-sm text-muted-foreground">
-                  Be the first to comment
-                </Text>
-              </View>
+              <EmptyState
+                className="mt-2"
+                icon={<MessageSquare size={22} color={theme.mutedForeground} />}
+                title="No comments yet"
+                description="Be the first to comment."
+              />
             ) : (
               post.comments.map((comment: CommunityCommentItem) => (
                 <CommentRow
@@ -510,37 +508,41 @@ export default function CommunityDiscussionScreen() {
         <BottomBar
           minInset={10}
           bordered={false}
-          className="flex-row items-center gap-2 border-t border-border/40 pt-2.5"
-          style={{
-            backgroundColor: theme.card,
-            marginBottom: keyboardInset,
-          }}
+          className="border-t border-border/40 bg-card px-0 pt-2.5"
+          style={{ marginBottom: keyboardInset }}
         >
-          <CommunityAvatar
-            label={currentAvatarSeed}
-            sourceUri={currentAvatarUrl}
-            theme={theme}
-            size="sm"
-          />
-          <TextInput
-            value={commentText}
-            onChangeText={setCommentText}
-            placeholder="Write a comment..."
-            placeholderTextColor={theme.mutedForeground}
-            className="flex-1 rounded-full border bg-muted/50 px-4 py-2.5 text-sm text-foreground"
-            style={{ color: theme.foreground, borderColor: theme.border }}
-            selectionColor={theme.primary}
-            returnKeyType="send"
-            onSubmitEditing={() => void handleSubmitComment()}
-          />
-          <Pressable
-            onPress={() => void handleSubmitComment()}
-            disabled={isCreatingComment || !commentText.trim()}
-            className="h-9 w-9 items-center justify-center rounded-full bg-primary"
-            style={{ opacity: commentText.trim() ? 1 : 0.4 }}
-          >
-            <Send size={14} color={theme.primaryForeground} />
-          </Pressable>
+          <ContentFrame width="reading" className="flex-row items-center gap-2">
+            <CommunityAvatar
+              label={currentAvatarSeed}
+              sourceUri={currentAvatarUrl}
+              theme={theme}
+              size="sm"
+            />
+            <TextInput
+              value={commentText}
+              onChangeText={setCommentText}
+              placeholder="Write a comment..."
+              placeholderTextColor={theme.mutedForeground}
+              accessibilityLabel="Write a comment"
+              className="min-h-11 flex-1 rounded-full border border-border bg-muted/50 px-4 py-2.5 text-sm text-foreground"
+              style={{ color: theme.foreground }}
+              selectionColor={theme.primary}
+              returnKeyType="send"
+              onSubmitEditing={() => void handleSubmitComment()}
+            />
+            <IconButton
+              label="Send comment"
+              variant="default"
+              onPress={() => void handleSubmitComment()}
+              disabled={isCreatingComment || !commentText.trim()}
+              className={cn(
+                "rounded-full",
+                !commentText.trim() && "opacity-40"
+              )}
+            >
+              <Send size={16} color={theme.primaryForeground} />
+            </IconButton>
+          </ContentFrame>
         </BottomBar>
       </KeyboardAvoidingView>
 

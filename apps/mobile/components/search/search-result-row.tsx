@@ -1,14 +1,13 @@
 import { memo } from "react"
+import type { LucideIcon } from "lucide-react-native"
 import BookOpen from "lucide-react-native/icons/book-open"
 import FileQuestion from "lucide-react-native/icons/file-question-mark"
 import FolderOpen from "lucide-react-native/icons/folder-open"
 import Layers from "lucide-react-native/icons/layers"
 import Lock from "lucide-react-native/icons/lock"
-import type { LucideIcon } from "lucide-react-native"
 import { Pressable, View } from "react-native"
 
 import type { SearchResult, SearchResultKind } from "@/lib/content/search"
-import { withOpacity } from "@/lib/theme"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Text } from "@/components/ui/text"
 
@@ -48,13 +47,12 @@ export const SearchResultRow = memo(function SearchResultRow({
     <Pressable
       onPress={() => onPress(result)}
       accessibilityRole="button"
-      className="min-h-[56px] flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:opacity-80"
-      style={{ backgroundColor: theme.card }}
+      accessibilityLabel={
+        result.isLocked ? `${result.title}, members only` : undefined
+      }
+      className="min-h-14 flex-row items-center gap-3 rounded-sm border border-border/60 bg-card px-3 py-2.5 active:bg-muted/60 web:hover:bg-muted/60"
     >
-      <View
-        className="h-9 w-9 items-center justify-center rounded-full"
-        style={{ backgroundColor: withOpacity(theme.primary, 0.1) }}
-      >
+      <View className="h-9 w-9 items-center justify-center rounded-full bg-primary/10">
         <Icon size={16} color={theme.primary} strokeWidth={2.2} />
       </View>
 

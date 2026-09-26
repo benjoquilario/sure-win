@@ -4,8 +4,10 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { Alert, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
+import { resolvePaperRules } from "@/lib/content/paper-rules"
 import type { FeedbackTiming, QuestionSource } from "@/lib/member/settings"
 import { abandonStudySession } from "@/lib/session/study-session"
+import { useBookmarks } from "@/hooks/use-bookmarks"
 import {
   useAnswerHistory,
   useExamCategory,
@@ -13,17 +15,11 @@ import {
   useQuestionSet,
 } from "@/hooks/use-exam-content"
 import { useExamSession } from "@/hooks/use-exam-session"
+import { useContentPadding } from "@/hooks/use-layout"
 import { useMemberSettings } from "@/hooks/use-member-settings"
-import { useBookmarks } from "@/hooks/use-bookmarks"
 import { useReport } from "@/hooks/use-report"
-import { ReportDialog } from "@/components/report"
-import { LockedPaper } from "@/components/exam/locked-paper"
-import { ExamQuestionCard } from "@/components/exam/question-card"
-import { QuestionNavigator } from "@/components/exam/question-navigator"
-import { SessionFooter } from "@/components/exam/session-footer"
-import { SessionResults } from "@/components/exam/session-results"
-import { SessionTopBar } from "@/components/exam/session-top-bar"
 import { Button } from "@/components/ui/button"
+import { ContentFrame } from "@/components/ui/content-frame"
 import {
   Dialog,
   DialogContent,
@@ -35,6 +31,13 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
+import { LockedPaper } from "@/components/exam/locked-paper"
+import { ExamQuestionCard } from "@/components/exam/question-card"
+import { QuestionNavigator } from "@/components/exam/question-navigator"
+import { SessionFooter } from "@/components/exam/session-footer"
+import { SessionResults } from "@/components/exam/session-results"
+import { SessionTopBar } from "@/components/exam/session-top-bar"
+import { ReportDialog } from "@/components/report"
 
 /**
  * ─── A sitting ────────────────────────────────────────────────────────────
@@ -99,11 +102,22 @@ export default function QuizScreen() {
   const category = categoryQuery.data ?? null
   const set = setId ? (setQuery.data ?? null) : null
 
+  // The paper this link names, checked the way the set screen checks it. The
+  // category decides the paywall, so a set from a *different* category must
+  // never load: `?categoryId=<free>&setId=<premium set>` would otherwise open
+  // the paid set with the free category's rules. Both lookups also return
+  // null for anything unpublished, which covers stale "Continue" cards.
+  const isResolvingPaper =
+    categoryQuery.isLoading || (Boolean(setId) && setQuery.isLoading)
+  const isPaperAvailable =
+    Boolean(category) &&
+    (!setId || (set !== null && set.categoryId === categoryId))
+
   const questionsQuery = useExamQuestions({
     categoryId,
     setId: setId || null,
     isPremiumCategory: category?.isPremium ?? false,
-    enabled: Boolean(category),
+    enabled: isPaperAvailable,
   })
 
   // Every source except "all" needs history. `bookmarked` was missing from
@@ -134,13 +148,22 @@ export default function QuizScreen() {
     answeredSkus: historyQuery.data?.answered,
     incorrectSkus: historyQuery.data?.incorrect,
     bookmarkedSkus: historyQuery.data?.bookmarked,
+    // History has to be in before the pool is built: the pool treats a
+    // missing set as "no filter" and locks in the first one it builds, so an
+    // "incorrect only" drill that started early served the whole paper.
     enabled:
-      Boolean(user?.$id && category) &&
+      Boolean(user?.$id) &&
+      isPaperAvailable &&
       !isLoadingSettings &&
-      !questionsQuery.isLoading,
+      !questionsQuery.isLoading &&
+      !(needsHistory && historyQuery.isLoading),
   })
 
-  const label = set ? `${category?.title ?? ""} — ${set.title}` : (category?.title ?? "Session")
+  const readingPadding = useContentPadding("reading")
+
+  const label = set
+    ? `${category?.title ?? ""} — ${set.title}`
+    : (category?.title ?? "Session")
 
   // Saving and reporting the item on screen. Both are scoped to the question,
   // not the sitting, so they survive a resume and mean the same thing in a
@@ -193,62 +216,134 @@ export default function QuizScreen() {
 
   if (!categoryId) {
     return (
-      <SafeAreaView className="flex-1 bg-background px-4 py-4">
+      <SafeAreaView className="flex-1 bg-background py-4">
         <Stack.Screen options={{ headerShown: false }} />
-        <EmptyState
-          tone="destructive"
-          title="Nothing to answer"
-          description="This link is missing the paper it should open."
-          action={
-            <Button
-              size="sm"
-              variant="outline"
-              onPress={() => router.replace("/board-exams")}
-            >
-              <Text>Browse categories</Text>
-            </Button>
-          }
-        />
+        <ContentFrame width="reading">
+          <EmptyState
+            tone="destructive"
+            title="Nothing to answer"
+            description="This link is missing the paper it should open."
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => router.replace("/board-exams")}
+              >
+                <Text>Browse categories</Text>
+              </Button>
+            }
+          />
+        </ContentFrame>
+      </SafeAreaView>
+    )
+  }
+
+  // Checked before availability: a dropped connection makes the category
+  // lookup fail, and that is not the same as the paper having been taken down.
+  const loadError =
+    categoryQuery.error ??
+    (setId ? setQuery.error : null) ??
+    questionsQuery.error
+
+  if (loadError) {
+    return (
+      <SafeAreaView className="flex-1 bg-background py-4">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ContentFrame width="reading">
+          <EmptyState
+            tone="destructive"
+            title="Questions could not be loaded"
+            description={
+              loadError instanceof Error
+                ? loadError.message
+                : "Check your connection and try again."
+            }
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => {
+                  void categoryQuery.refetch()
+                  if (setId) {
+                    void setQuery.refetch()
+                  }
+                  void questionsQuery.refetch()
+                }}
+              >
+                <Text>Try again</Text>
+              </Button>
+            }
+          />
+        </ContentFrame>
+      </SafeAreaView>
+    )
+  }
+
+  if (!isResolvingPaper && !isPaperAvailable) {
+    return (
+      <SafeAreaView className="flex-1 bg-background py-4">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ContentFrame width="reading">
+          <EmptyState
+            tone="destructive"
+            title="This paper is not available"
+            description="It may have been taken down for updates, or the link is out of date."
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => router.replace("/board-exams")}
+              >
+                <Text>Browse categories</Text>
+              </Button>
+            }
+          />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
 
   if (
+    isResolvingPaper ||
     questionsQuery.isLoading ||
-    categoryQuery.isLoading ||
+    (needsHistory && historyQuery.isLoading) ||
     isLoadingSettings ||
     session.status === "preparing" ||
     session.status === "idle"
   ) {
     return (
-      <SafeAreaView className="flex-1 gap-3 bg-background px-4 py-6">
+      <SafeAreaView className="flex-1 bg-background py-6">
         <Stack.Screen options={{ headerShown: false }} />
-        <Skeleton className="h-8 rounded-md" />
-        <Skeleton className="h-44 rounded-xl" />
-        <Skeleton className="h-14 rounded-md" />
-        <Skeleton className="h-14 rounded-md" />
-        <Skeleton className="h-14 rounded-md" />
+        <ContentFrame width="reading" className="gap-3">
+          <Skeleton className="h-8 rounded-md" />
+          <Skeleton className="h-44 rounded-xl" />
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
 
   if (session.status === "error") {
     return (
-      <SafeAreaView className="flex-1 bg-background px-4 py-4">
+      <SafeAreaView className="flex-1 bg-background py-4">
         <Stack.Screen options={{ headerShown: false }} />
-        <EmptyState
-          tone="destructive"
-          title="Could not start this sitting"
-          description={
-            session.error?.message ??
-            "Something went wrong opening your session. Please try again."
-          }
-          action={
-            <Button size="sm" variant="outline" onPress={() => router.back()}>
-              <Text>Go back</Text>
-            </Button>
-          }
-        />
+        <ContentFrame width="reading">
+          <EmptyState
+            tone="destructive"
+            title="Could not start this sitting"
+            description={
+              session.error?.message ??
+              "Something went wrong opening your session. Please try again."
+            }
+            action={
+              <Button size="sm" variant="outline" onPress={() => router.back()}>
+                <Text>Go back</Text>
+              </Button>
+            }
+          />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -258,38 +353,45 @@ export default function QuizScreen() {
   // would be a lie about why.
   if (session.questionCount === 0 && questionsQuery.hiddenCount > 0) {
     return (
-      <SafeAreaView className="flex-1 bg-background px-4 py-4">
+      <SafeAreaView className="flex-1 bg-background py-4">
         <Stack.Screen options={{ headerShown: false }} />
-        <LockedPaper
-          title={label}
-          questionCount={questionsQuery.hiddenCount}
-          onUpgrade={() => router.push("/premium")}
-          onBack={() => router.replace("/board-exams")}
-        />
+        <ContentFrame width="reading">
+          <LockedPaper
+            title={label}
+            questionCount={questionsQuery.hiddenCount}
+            onUpgrade={() => router.push("/premium")}
+            onBack={() => router.replace("/board-exams")}
+          />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
 
   if (session.questionCount === 0) {
     return (
-      <SafeAreaView className="flex-1 bg-background px-4 py-4">
+      <SafeAreaView className="flex-1 bg-background py-4">
         <Stack.Screen options={{ headerShown: false }} />
-        <EmptyState
-          title="Nothing matched"
-          description="No questions fit the filters for this paper. Try a different source or difficulty."
-          action={
-            <Button size="sm" variant="outline" onPress={() => router.back()}>
-              <Text>Change setup</Text>
-            </Button>
-          }
-        />
+        <ContentFrame width="reading">
+          <EmptyState
+            title="Nothing matched"
+            description="No questions fit the filters for this paper. Try a different source or difficulty."
+            action={
+              <Button size="sm" variant="outline" onPress={() => router.back()}>
+                <Text>Change setup</Text>
+              </Button>
+            }
+          />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
 
   if (session.status === "complete" && session.result) {
     return (
-      <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-background">
+      <SafeAreaView
+        edges={["top", "left", "right"]}
+        className="flex-1 bg-background"
+      >
         <Stack.Screen options={{ headerShown: false }} />
         <SessionResults
           label={label}
@@ -302,6 +404,9 @@ export default function QuizScreen() {
           // They have just done the work and seen a score. If there is more
           // behind the paywall, this is the moment worth saying so.
           hiddenCount={questionsQuery.hiddenCount}
+          passingScore={
+            category ? resolvePaperRules(category, set).passingScore : undefined
+          }
           onDone={() => router.back()}
           onRetry={handleRetry}
           onUpgrade={
@@ -319,7 +424,10 @@ export default function QuizScreen() {
   const isLast = session.activeIndex === session.questionCount - 1
 
   return (
-    <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-background">
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      className="flex-1 bg-background"
+    >
       <Stack.Screen options={{ headerShown: false }} />
 
       <SessionTopBar
@@ -333,7 +441,11 @@ export default function QuizScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+        contentContainerStyle={{
+          ...readingPadding,
+          paddingTop: 16,
+          paddingBottom: 24,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {session.activeQuestion ? (

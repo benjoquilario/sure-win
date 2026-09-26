@@ -4,10 +4,13 @@ import { ActivityIndicator, Linking, Platform, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import { APPWRITE_CONFIG } from "@/lib/appwrite"
+import { useThemePalette } from "@/hooks/use-theme"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { Text } from "@/components/ui/text"
 
 export default function VerifyEmailBridgeScreen() {
   const params = useLocalSearchParams<{ userId?: string; secret?: string }>()
+  const theme = useThemePalette()
   const [message, setMessage] = useState(
     "Preparing secure verification handoff to the app."
   )
@@ -46,14 +49,19 @@ export default function VerifyEmailBridgeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-1 items-center justify-center gap-4 px-6">
-        <ActivityIndicator size="large" />
-        <Text className="text-center text-xl font-black text-foreground">
-          Opening Reviewer
-        </Text>
-        <Text className="text-center text-sm leading-6 text-muted-foreground">
-          {message}
-        </Text>
+      <View className="flex-1 justify-center">
+        <ContentFrame width="reading" className="items-center gap-4">
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text
+            role="heading"
+            className="text-center text-xl font-extrabold text-foreground"
+          >
+            Opening Reviewer
+          </Text>
+          <Text className="text-center text-sm leading-6 text-muted-foreground">
+            {message}
+          </Text>
+        </ContentFrame>
       </View>
     </SafeAreaView>
   )

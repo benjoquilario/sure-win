@@ -21,6 +21,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { IconButton } from "@/components/ui/icon-button"
 import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 
@@ -86,7 +87,7 @@ export function CommunityComposerDialog({
             className="flex-row items-start justify-between border-b px-4 pb-3 pt-3.5"
             style={{ borderColor: theme.border }}
           >
-            <View className="flex-1 pr-3">
+            <View className="min-w-0 flex-1 pr-3">
               <DialogTitle className="text-lg">Start a thread</DialogTitle>
               <DialogDescription className="mt-0.5 text-xs leading-5">
                 Ask clearly, attach one image if needed, and keep details
@@ -94,18 +95,14 @@ export function CommunityComposerDialog({
               </DialogDescription>
             </View>
 
-            <Pressable
-              className="h-9 w-9 items-center justify-center rounded-full border"
-              style={{
-                borderColor: theme.border,
-                backgroundColor: theme.background,
-              }}
+            <IconButton
+              label="Close thread composer"
+              variant="outline"
+              className="rounded-full"
               onPress={() => onOpenChange(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Close thread composer"
             >
               <X size={16} color={theme.mutedForeground} />
-            </Pressable>
+            </IconButton>
           </View>
 
           <ScrollView
@@ -114,8 +111,7 @@ export function CommunityComposerDialog({
             contentContainerStyle={{
               paddingHorizontal: 14,
               paddingTop: 12,
-              paddingBottom:
-                Math.max(insets.bottom, 18) + keyboardInset + 8,
+              paddingBottom: Math.max(insets.bottom, 18) + keyboardInset + 8,
               gap: 10,
             }}
             contentInsetAdjustmentBehavior="automatic"
@@ -124,9 +120,7 @@ export function CommunityComposerDialog({
             showsVerticalScrollIndicator={false}
           >
             <View className="gap-1.5">
-              <Text variant="label">
-                Thread type
-              </Text>
+              <Text variant="label">Thread type</Text>
               <View className="flex-row flex-wrap gap-2">
                 {categories.map((category) => {
                   const isActive = selectedCategory === category
@@ -134,6 +128,9 @@ export function CommunityComposerDialog({
                   return (
                     <Pressable
                       key={category}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isActive }}
+                      hitSlop={6}
                       className="rounded-full border px-3 py-1.5"
                       style={{
                         borderColor: isActive ? theme.primary : theme.border,
@@ -159,12 +156,15 @@ export function CommunityComposerDialog({
             </View>
 
             <View className="gap-1.5">
-              <Text variant="label">
-                Subject lane
-              </Text>
+              <Text variant="label">Subject lane</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View className="flex-row gap-2 pr-2">
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      selected: selectedSubjectId === null,
+                    }}
+                    hitSlop={6}
                     className="rounded-full border px-3 py-1.5"
                     style={{
                       borderColor:
@@ -194,6 +194,9 @@ export function CommunityComposerDialog({
                     return (
                       <Pressable
                         key={subject.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isActive }}
+                        hitSlop={6}
                         className="rounded-full border px-3 py-1.5"
                         style={{
                           borderColor: isActive ? theme.primary : theme.border,
@@ -220,9 +223,7 @@ export function CommunityComposerDialog({
             </View>
 
             <View className="gap-1.5 rounded-lg border border-border bg-background p-3">
-              <Text variant="label">
-                Title
-              </Text>
+              <Text variant="label">Title</Text>
               <TextInput
                 value={titleDraft}
                 onChangeText={onChangeTitleDraft}
@@ -240,11 +241,11 @@ export function CommunityComposerDialog({
             </View>
 
             <View className="gap-1.5 rounded-lg border border-border bg-background p-3">
-              <Text variant="label">
-                Image
-              </Text>
+              <Text variant="label">Image</Text>
               <View className="flex-row gap-2">
                 <Pressable
+                  accessibilityRole="button"
+                  hitSlop={4}
                   className="h-10 flex-1 flex-row items-center justify-center gap-2 rounded-md border"
                   style={{
                     borderColor: theme.border,
@@ -263,6 +264,9 @@ export function CommunityComposerDialog({
                 </Pressable>
                 {photoUrlDraft ? (
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove image"
+                    hitSlop={4}
                     className="h-10 w-10 items-center justify-center rounded-md border"
                     style={{
                       borderColor: theme.border,
@@ -300,9 +304,7 @@ export function CommunityComposerDialog({
             ) : null}
 
             <View className="gap-1.5 rounded-lg border border-border bg-background p-3">
-              <Text variant="label">
-                Thread body
-              </Text>
+              <Text variant="label">Thread body</Text>
               <TextInput
                 value={contentDraft}
                 onChangeText={onChangeContentDraft}

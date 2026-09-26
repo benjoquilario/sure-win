@@ -1,10 +1,14 @@
 import Plus from "lucide-react-native/icons/plus"
-import Search from "lucide-react-native/icons/search"
 import { Pressable, View } from "react-native"
 
-import { THEME, withOpacity } from "@/lib/theme"
+import { THEME } from "@/lib/theme"
+import { cn } from "@/lib/utils"
+import { useLayout } from "@/hooks/use-layout"
+import { IconButton } from "@/components/ui/icon-button"
+import { StatTile } from "@/components/ui/stat-tile"
 import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
+import { AppShellHeader } from "@/components/app-shell-header"
 import { CommunityAvatar } from "@/components/community/avatar"
 
 type ThemePalette = (typeof THEME)["light"] | (typeof THEME)["dark"]
@@ -27,6 +31,13 @@ type CommunityFeedHeaderProps = {
   currentUserAvatarUrl?: string | null
 }
 
+/**
+ * Everything above the first thread: title, composer prompt, the three
+ * community numbers and the category filter.
+ *
+ * Rendered as the feed's list header, so it inherits the list's reading-width
+ * padding and lines up with the cards below it.
+ */
 export function CommunityFeedHeader({
   activeFeedFilter,
   filters,
@@ -38,128 +49,103 @@ export function CommunityFeedHeader({
   currentUserAvatarLabel,
   currentUserAvatarUrl,
 }: CommunityFeedHeaderProps) {
+  const { isSmallPhone, paddingFor } = useLayout()
+  // The list's own padding, so the filter row can scroll edge to edge while
+  // its first pill starts on the content edge.
+  const bleed = paddingFor("reading")
+  // Three tiles share 296pt on a 320pt phone; the default inset leaves
+  // "Answered" no room.
+  const tileClass = cn("min-w-0 flex-1", isSmallPhone && "px-2.5")
+
   return (
-    <View className="gap-3 pb-2">
-      {/* Top bar title */}
-      <View className="flex-row items-center justify-between">
-        <Text className="text-xl font-black text-foreground">
-          Community
-        </Text>
-        <View
-          className="h-9 w-9 items-center justify-center rounded-full"
-          style={{
-            backgroundColor: withOpacity(theme.muted, 0.8),
-            borderWidth: 1,
-            borderColor: theme.border,
-          }}
-        >
-          <Search size={16} color={theme.mutedForeground} />
-        </View>
-      </View>
+    <View className="gap-4 pb-3">
+      <AppShellHeader compact eyebrow="Forum" title="Community" />
 
       {/* Composer prompt */}
-      <View
-        className="flex-row items-center gap-3 rounded-xl bg-card px-3.5 py-3"
-        style={{ borderWidth: 1, borderColor: theme.border }}
-      >
+      <View className="flex-row items-center gap-3 rounded-xl border border-border/80 bg-card px-3.5 py-3">
         <CommunityAvatar
           label={currentUserAvatarLabel ?? "RV"}
           sourceUri={currentUserAvatarUrl}
           theme={theme}
           size="md"
         />
-        <Pressable className="flex-1" onPress={onOpenComposer}>
-          <Text className="text-sm text-muted-foreground">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Start a thread"
+          className="min-h-11 min-w-0 flex-1 justify-center rounded-md px-1 web:hover:bg-muted/60"
+          onPress={onOpenComposer}
+        >
+          <Text className="text-sm text-muted-foreground" numberOfLines={1}>
             What&apos;s on your mind?
           </Text>
         </Pressable>
-        <Pressable
+        <IconButton
+          label="Create a post"
+          variant="default"
+          className="rounded-full"
           onPress={onOpenComposer}
-          className="h-9 w-9 items-center justify-center rounded-full bg-primary"
         >
-          <Plus size={16} color={theme.primaryForeground} />
-        </Pressable>
+          <Plus size={18} color={theme.primaryForeground} />
+        </IconButton>
       </View>
 
-      {/* Stats row */}
+      {/* Community numbers */}
       <View className="flex-row gap-2">
-        <View
-          className="flex-1 items-center rounded-xl py-2.5"
-          style={{
-            backgroundColor: withOpacity(theme.primary, 0.08),
-            borderWidth: 1,
-            borderColor: theme.border,
-          }}
-        >
-          <Text className="text-sm font-black text-primary">
-            {totalPosts}
-          </Text>
-          <Text variant="label">
-            Threads
-          </Text>
-        </View>
-        <View
-          className="flex-1 items-center rounded-xl py-2.5"
-          style={{
-            backgroundColor: withOpacity(theme.primary, 0.08),
-            borderWidth: 1,
-            borderColor: theme.border,
-          }}
-        >
-          <Text className="text-sm font-black text-primary">
-            {stats?.activeLearners ?? 0}
-          </Text>
-          <Text variant="label">
-            Active
-          </Text>
-        </View>
-        <View
-          className="flex-1 items-center rounded-xl py-2.5"
-          style={{
-            backgroundColor: withOpacity(theme.primary, 0.08),
-            borderWidth: 1,
-            borderColor: theme.border,
-          }}
-        >
-          <Text className="text-sm font-black text-primary">
-            {stats?.answeredToday ?? 0}
-          </Text>
-          <Text variant="label">
-            Answered
-          </Text>
-        </View>
+        <StatTile
+          className={tileClass}
+          label="Threads"
+          value={String(totalPosts)}
+          tone="primary"
+        />
+        <StatTile
+          className={tileClass}
+          label="Active"
+          value={String(stats?.activeLearners ?? 0)}
+          tone="primary"
+        />
+        <StatTile
+          className={tileClass}
+          label="Answered"
+          value={String(stats?.answeredToday ?? 0)}
+          tone="primary"
+        />
       </View>
 
       {/* Filter pills */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View className="flex-row gap-2 pr-2">
-          {filters.map((filter) => {
-            const isActive = activeFeedFilter === filter
-            return (
-              <Pressable
-                key={filter}
-                onPress={() => onChangeFeedFilter(filter)}
-                className="rounded-full px-4 py-2"
-                style={{
-                  backgroundColor: isActive
-                    ? theme.primary
-                    : withOpacity(theme.muted, 0.8),
-                }}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -bleed }}
+        contentContainerClassName="gap-2"
+        contentContainerStyle={{ paddingHorizontal: bleed }}
+      >
+        {filters.map((filter) => {
+          const isActive = activeFeedFilter === filter
+          return (
+            <Pressable
+              key={filter}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+              hitSlop={6}
+              onPress={() => onChangeFeedFilter(filter)}
+              className={cn(
+                "rounded-full px-4 py-2",
+                isActive
+                  ? "bg-primary"
+                  : "bg-muted/80 active:bg-muted web:hover:bg-muted"
+              )}
+            >
+              <Text
+                className={cn(
+                  "text-xs font-bold capitalize",
+                  isActive ? "text-primary-foreground" : "text-muted-foreground"
+                )}
               >
-                <Text
-                  className="text-xs font-bold capitalize"
-                  style={{
-                    color: isActive
-                      ? theme.primaryForeground
-                      : theme.mutedForeground,
-                  }}
-                >
-                  {filter}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </View>
+                {filter}
+              </Text>
+            </Pressable>
+          )
+        })}
       </ScrollView>
     </View>
   )

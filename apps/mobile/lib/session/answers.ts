@@ -1,7 +1,13 @@
-import { Query } from "../appwrite"
-import { buildDeterministicRowId, listAll, listPage, upsertRowById } from "../db"
 import { toChoiceLabel, type UserAnswerDocument } from "@workspace/schema"
+
+import { Query } from "../appwrite"
 import type { ExamQuestion } from "../content/questions"
+import {
+  buildDeterministicRowId,
+  listAll,
+  listPage,
+  upsertRowById,
+} from "../db"
 
 /**
  * ─── Answer history ───────────────────────────────────────────────────────
@@ -125,14 +131,25 @@ export async function listIncorrectSkus(params: {
   userId: string
   categoryId?: string
   questionnaireId?: string
+  /**
+   * Leave one sitting out. A resumed session rebuilds its pool from history
+   * as it stood when the sitting began; counting the sitting's own answers
+   * made an "unanswered" drill drop every item already answered in it.
+   */
+  excludeSessionId?: string
 }): Promise<Set<string>> {
   const rows = await listAll(
     "user_answers",
     [
       Query.equal("userId", params.userId),
-      ...(params.categoryId ? [Query.equal("categoryId", params.categoryId)] : []),
+      ...(params.categoryId
+        ? [Query.equal("categoryId", params.categoryId)]
+        : []),
       ...(params.questionnaireId
         ? [Query.equal("questionnaireId", params.questionnaireId)]
+        : []),
+      ...(params.excludeSessionId
+        ? [Query.notEqual("sessionId", params.excludeSessionId)]
         : []),
       Query.equal("isCorrect", false),
     ],
@@ -147,14 +164,25 @@ export async function listAnsweredSkus(params: {
   userId: string
   categoryId?: string
   questionnaireId?: string
+  /**
+   * Leave one sitting out. A resumed session rebuilds its pool from history
+   * as it stood when the sitting began; counting the sitting's own answers
+   * made an "unanswered" drill drop every item already answered in it.
+   */
+  excludeSessionId?: string
 }): Promise<Set<string>> {
   const rows = await listAll(
     "user_answers",
     [
       Query.equal("userId", params.userId),
-      ...(params.categoryId ? [Query.equal("categoryId", params.categoryId)] : []),
+      ...(params.categoryId
+        ? [Query.equal("categoryId", params.categoryId)]
+        : []),
       ...(params.questionnaireId
         ? [Query.equal("questionnaireId", params.questionnaireId)]
+        : []),
+      ...(params.excludeSessionId
+        ? [Query.notEqual("sessionId", params.excludeSessionId)]
         : []),
     ],
     { label: "answered items", maxRows: 4000 }

@@ -1,23 +1,28 @@
 import { memo } from "react"
-import { Pressable, View } from "react-native"
 import BarChart3 from "lucide-react-native/icons/chart-column"
 import ChevronLeft from "lucide-react-native/icons/chevron-left"
 import ChevronRight from "lucide-react-native/icons/chevron-right"
 import Clock3 from "lucide-react-native/icons/clock-3"
 import Flame from "lucide-react-native/icons/flame"
 import Trophy from "lucide-react-native/icons/trophy"
+import { Pressable, View } from "react-native"
+
 import type {
   DashboardReportMetrics,
   QuestionsAnsweredTimeline,
   TimelineWindow,
 } from "@/lib/performance-stats"
-import { THEME, withOpacity } from "@/lib/theme"
+import type { ThemePalette } from "@/lib/theme"
+import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Text } from "@/components/ui/text"
+import { IconButton } from "@/components/ui/icon-button"
+import { SectionHeader } from "@/components/ui/section-header"
 import { Skeleton } from "@/components/ui/skeleton"
-import { BarChart } from "./bar-chart"
+import { StatTile } from "@/components/ui/stat-tile"
+import { Text } from "@/components/ui/text"
 
-type ThemePalette = (typeof THEME)["light"] | (typeof THEME)["dark"]
+import { BarChart } from "./bar-chart"
 
 const WINDOWS: TimelineWindow[] = ["week", "month", "year"]
 const WINDOW_LABELS: Record<TimelineWindow, string> = {
@@ -29,36 +34,34 @@ const WINDOW_LABELS: Record<TimelineWindow, string> = {
 const WindowToggle = memo(function WindowToggle({
   active,
   onSelect,
-  theme,
 }: {
   active: TimelineWindow
   onSelect: (w: TimelineWindow) => void
-  theme: ThemePalette
 }) {
   return (
     <View
-      className="flex-row overflow-hidden rounded-xl"
-      style={{ backgroundColor: withOpacity(theme.primary, 0.08) }}
+      role="tablist"
+      className="flex-row self-start rounded-full bg-primary/10 p-1"
     >
       {WINDOWS.map((w) => {
         const isActive = w === active
         return (
           <Pressable
             key={w}
+            role="tab"
+            accessibilityState={{ selected: isActive }}
+            hitSlop={4}
             onPress={() => onSelect(w)}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              borderRadius: 16,
-              backgroundColor: isActive ? theme.primary : "transparent",
-            }}
+            className={cn(
+              "h-9 items-center justify-center rounded-full px-4",
+              isActive ? "bg-primary" : "web:hover:bg-primary/10"
+            )}
           >
             <Text
-              style={{
-                fontSize: 12,
-                fontWeight: "700",
-                color: isActive ? theme.primaryForeground : theme.mutedForeground,
-              }}
+              className={cn(
+                "text-xs font-bold",
+                isActive ? "text-primary-foreground" : "text-muted-foreground"
+              )}
             >
               {WINDOW_LABELS[w]}
             </Text>
@@ -83,38 +86,38 @@ const DateNavigator = memo(function DateNavigator({
   theme: ThemePalette
 }) {
   return (
-    <View className="flex-row items-center justify-between">
-      <Text style={{ fontSize: 13, fontWeight: "700", color: theme.foreground }}>
+    <View className="flex-row items-center justify-between gap-2">
+      <Text
+        className="flex-1 text-sm font-bold text-foreground"
+        numberOfLines={1}
+      >
         {rangeLabel}
       </Text>
       <View className="flex-row items-center gap-1.5">
-        <Pressable
+        <IconButton
+          label="Previous period"
+          variant="soft"
+          size="sm"
           onPress={onPrev}
-          style={{
-            width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center",
-            backgroundColor: withOpacity(theme.primary, 0.08),
-          }}
         >
           <ChevronLeft size={16} color={theme.primary} />
-        </Pressable>
+        </IconButton>
         <Pressable
+          role="button"
+          hitSlop={4}
           onPress={onToday}
-          style={{
-            paddingHorizontal: 14, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center",
-            backgroundColor: withOpacity(theme.primary, 0.08),
-          }}
+          className="h-10 items-center justify-center rounded-lg bg-primary/10 px-3.5 active:bg-primary/15 web:hover:bg-primary/15"
         >
-          <Text style={{ fontSize: 12, fontWeight: "700", color: theme.primary }}>Today</Text>
+          <Text className="text-xs font-bold text-primary">Today</Text>
         </Pressable>
-        <Pressable
+        <IconButton
+          label="Next period"
+          variant="soft"
+          size="sm"
           onPress={onNext}
-          style={{
-            width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center",
-            backgroundColor: withOpacity(theme.primary, 0.08),
-          }}
         >
           <ChevronRight size={16} color={theme.primary} />
-        </Pressable>
+        </IconButton>
       </View>
     </View>
   )
@@ -132,6 +135,7 @@ export const ActivityMetricsSection = memo(function ActivityMetricsSection({
   onNext,
   onToday,
   theme,
+  isWide = false,
 }: {
   timeline: QuestionsAnsweredTimeline | null
   reportMetrics: DashboardReportMetrics | null
@@ -144,8 +148,15 @@ export const ActivityMetricsSection = memo(function ActivityMetricsSection({
   onNext: () => void
   onToday: () => void
   theme: ThemePalette
+  /** Room for the four snapshot tiles in one row instead of a 2×2 grid. */
+  isWide?: boolean
 }) {
-  const periodLabel = window === "week" ? "This Week" : window === "month" ? "This Month" : "This Year"
+  const periodLabel =
+    window === "week"
+      ? "This Week"
+      : window === "month"
+        ? "This Month"
+        : "This Year"
   const reportCards = reportMetrics
     ? [
         reportMetrics.today,
@@ -154,172 +165,109 @@ export const ActivityMetricsSection = memo(function ActivityMetricsSection({
         reportMetrics.year,
       ]
     : []
+  // A basis under a half (or a quarter) leaves room for the gap; flexGrow
+  // then fills the row, so tiles wrap into an even grid at any width.
+  const snapshotBasis = isWide ? "22%" : "40%"
 
   return (
-    <View className="gap-3">
-      <View className="gap-0.5">
-        <Text variant="eyebrow">
-          Activity Metrics
-        </Text>
-        <Text className="text-base font-extrabold text-foreground">
-          Questions Answered
-        </Text>
-      </View>
+    <View className="gap-6">
+      <View className="gap-3">
+        <SectionHeader eyebrow="Activity Metrics" title="Questions Answered" />
 
-      <View className="flex-row items-center justify-between">
-        <WindowToggle active={window} onSelect={onWindowChange} theme={theme} />
-      </View>
+        <WindowToggle active={window} onSelect={onWindowChange} />
 
-      {isLoading ? (
-        <Skeleton className="h-36 rounded-xl" />
-      ) : timeline ? (
-        <Card style={{ borderWidth: 1, borderColor: theme.border }}>
-          <CardContent className="gap-4">
-            <BarChart
-              timeline={timeline}
-              theme={theme}
-              selectedBarIndex={selectedBarIndex}
-              onSelectBar={onSelectBar}
-            />
-            <DateNavigator
-              rangeLabel={timeline.rangeLabel}
-              onPrev={onPrev}
-              onNext={onNext}
-              onToday={onToday}
-              theme={theme}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {timeline ? (
-        <View className="flex-row gap-2.5">
-          <Card className="flex-1" style={{ borderWidth: 1, borderColor: theme.border }}>
-            <CardContent size="compact" className="gap-1.5">
-              <View className="flex-row items-center gap-1.5">
-                <BarChart3 size={13} color={theme.primary} />
-                <Text variant="eyebrow">
-                  {periodLabel}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 20, fontWeight: "900", color: theme.foreground }}>
-                {timeline.questionsThisPeriod}
-              </Text>
-              <Text className="text-2xs text-muted-foreground">questions answered</Text>
+        {isLoading ? (
+          <Skeleton className="h-36 rounded-xl" />
+        ) : timeline ? (
+          <Card>
+            <CardContent className="gap-4">
+              <BarChart
+                timeline={timeline}
+                theme={theme}
+                selectedBarIndex={selectedBarIndex}
+                onSelectBar={onSelectBar}
+              />
+              <DateNavigator
+                rangeLabel={timeline.rangeLabel}
+                onPrev={onPrev}
+                onNext={onNext}
+                onToday={onToday}
+                theme={theme}
+              />
             </CardContent>
           </Card>
-          <Card className="flex-1" style={{ borderWidth: 1, borderColor: theme.border }}>
-            <CardContent size="compact" className="gap-1.5">
-              <View className="flex-row items-center gap-1.5">
-                <Trophy size={13} color={theme.accent} />
-                <Text className="text-2xs font-bold uppercase tracking-[1px] text-accent-text">
-                  Best Day
-                </Text>
-              </View>
-              <Text style={{ fontSize: 20, fontWeight: "900", color: theme.foreground }}>
-                {timeline.mostAnsweredInOneDay}
-              </Text>
-              <Text className="text-2xs text-muted-foreground" numberOfLines={1}>
-                {timeline.mostAnsweredDate}
-              </Text>
-            </CardContent>
-          </Card>
-        </View>
-      ) : null}
+        ) : null}
+
+        {timeline ? (
+          <View className="flex-row gap-3">
+            <StatTile
+              className="flex-1"
+              icon={<BarChart3 size={14} color={theme.primary} />}
+              label={periodLabel}
+              value={String(timeline.questionsThisPeriod)}
+              caption="questions answered"
+            />
+            <StatTile
+              className="flex-1"
+              icon={<Trophy size={14} color={theme.accentText} />}
+              label="Best Day"
+              value={String(timeline.mostAnsweredInOneDay)}
+              caption={timeline.mostAnsweredDate}
+            />
+          </View>
+        ) : null}
+      </View>
 
       {reportMetrics ? (
-        <View className="gap-2.5">
-          <View className="gap-0.5">
-            <Text variant="eyebrow">
-              Report Snapshots
-            </Text>
-            <Text className="text-base font-extrabold text-foreground">
-              Daily to Yearly Progress
-            </Text>
-          </View>
+        <View className="gap-3">
+          <SectionHeader
+            eyebrow="Report Snapshots"
+            title="Daily to Yearly Progress"
+          />
 
-          <View className="flex-row flex-wrap gap-2.5">
+          <View className="flex-row flex-wrap gap-3">
             {reportCards.map((snapshot) => (
-              <Card
+              <StatTile
                 key={snapshot.label}
-                className="min-w-[47%] flex-1"
-                style={{ borderWidth: 1, borderColor: theme.border }}
-              >
-                <CardContent size="compact" className="gap-2">
-                  <Text variant="eyebrow">
-                    {snapshot.label}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 22,
-                      fontWeight: "900",
-                      color: theme.foreground,
-                    }}
-                  >
-                    {snapshot.answeredCount}
-                  </Text>
-                  <Text className="text-2xs text-muted-foreground">
-                    answered · {snapshot.accuracyRate}% accuracy
-                  </Text>
-                  <Text className="text-2xs text-muted-foreground">
-                    {snapshot.studyMinutes} min · {snapshot.activeDaysCount} active
-                    day{snapshot.activeDaysCount === 1 ? "" : "s"}
-                  </Text>
-                  <Text className="text-2xs text-muted-foreground">
-                    {snapshot.earnedAchievementsCount} achievements earned
-                  </Text>
-                </CardContent>
-              </Card>
+                style={{ flexBasis: snapshotBasis, flexGrow: 1 }}
+                label={snapshot.label}
+                value={String(snapshot.answeredCount)}
+                caption={[
+                  `answered · ${snapshot.accuracyRate}% accuracy`,
+                  `${snapshot.studyMinutes} min · ${snapshot.activeDaysCount} active day${snapshot.activeDaysCount === 1 ? "" : "s"}`,
+                  `${snapshot.earnedAchievementsCount} achievements earned`,
+                ].join("\n")}
+              />
             ))}
           </View>
 
-          <Card style={{ borderWidth: 1, borderColor: theme.border }}>
+          <Card>
             <CardContent className="gap-3">
-              <View className="flex-row items-center justify-between gap-3">
-                <View>
-                  <Text variant="eyebrow">
-                    Lifetime Summary
-                  </Text>
-                  <Text className="text-base font-extrabold text-foreground">
-                    Long-term reviewer momentum
-                  </Text>
+              <View className="flex-row items-start justify-between gap-3">
+                <View className="flex-1 gap-1">
+                  <Text variant="eyebrow">Lifetime Summary</Text>
+                  <Text variant="subheading">Long-term reviewer momentum</Text>
                 </View>
-                <View
-                  className="rounded-full px-3 py-1"
-                  style={{ backgroundColor: withOpacity(theme.primary, 0.12) }}
-                >
-                  <Text variant="eyebrow">
-                    {reportMetrics.lifetime.achievementsCount} badges
-                  </Text>
-                </View>
+                <Badge tone="primary">
+                  {`${reportMetrics.lifetime.achievementsCount} badges`}
+                </Badge>
               </View>
 
-              <View className="flex-row flex-wrap gap-2.5">
-                <View className="min-w-[47%] flex-1 rounded-xl p-3" style={{ backgroundColor: withOpacity(theme.primary, 0.08) }}>
-                  <View className="flex-row items-center gap-1.5">
-                    <Flame size={13} color={theme.accent} />
-                    <Text className="text-2xs font-bold uppercase tracking-[1px]" style={{ color: theme.accent }}>
-                      Current Streak
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 20, fontWeight: "900", color: theme.foreground }}>
-                    {reportMetrics.lifetime.dayStreak}
-                  </Text>
-                  <Text className="text-2xs text-muted-foreground">consecutive days</Text>
-                </View>
-
-                <View className="min-w-[47%] flex-1 rounded-xl p-3" style={{ backgroundColor: withOpacity(theme.primary, 0.08) }}>
-                  <View className="flex-row items-center gap-1.5">
-                    <Clock3 size={13} color={theme.primary} />
-                    <Text variant="eyebrow">
-                      Study Time
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 20, fontWeight: "900", color: theme.foreground }}>
-                    {reportMetrics.lifetime.totalStudyMinutes}
-                  </Text>
-                  <Text className="text-2xs text-muted-foreground">minutes tracked</Text>
-                </View>
+              <View className="flex-row flex-wrap gap-3">
+                <StatTile
+                  style={{ flexBasis: "40%", flexGrow: 1 }}
+                  icon={<Flame size={14} color={theme.accentText} />}
+                  label="Current Streak"
+                  value={String(reportMetrics.lifetime.dayStreak)}
+                  caption="consecutive days"
+                />
+                <StatTile
+                  style={{ flexBasis: "40%", flexGrow: 1 }}
+                  icon={<Clock3 size={14} color={theme.primary} />}
+                  label="Study Time"
+                  value={String(reportMetrics.lifetime.totalStudyMinutes)}
+                  caption="minutes tracked"
+                />
               </View>
             </CardContent>
           </Card>

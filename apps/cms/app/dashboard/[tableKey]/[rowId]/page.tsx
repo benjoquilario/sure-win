@@ -27,6 +27,7 @@ import {
   getReviewerTableDefinition,
   getTableAccess,
   isReviewerTableKey,
+  roleCanPublishTable,
   roleCanUseTable,
 } from "@workspace/schema";
 import { requireCmsUser } from "@/lib/appwrite/auth";
@@ -143,6 +144,7 @@ export default async function RecordPage({
             tableKey={tableKey}
             row={row}
             relationOptionsPromise={relationOptionsPromise}
+            canPublish={roleCanPublishTable(cmsUser.role, tableKey)}
           />
         )}
       </Suspense>
@@ -165,10 +167,12 @@ async function EditRecordFormSection({
   tableKey,
   row,
   relationOptionsPromise,
+  canPublish,
 }: {
   tableKey: TableKey;
   row: NonNullable<CmsRowData>;
   relationOptionsPromise: Promise<RelationOptions>;
+  canPublish: boolean;
 }) {
   const relationOptions = await relationOptionsPromise;
 
@@ -177,6 +181,7 @@ async function EditRecordFormSection({
       tableKey={tableKey}
       row={row}
       relationOptions={relationOptions}
+      canPublish={canPublish}
     />
   );
 }

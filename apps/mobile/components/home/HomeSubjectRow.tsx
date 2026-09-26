@@ -52,7 +52,7 @@ export const HomeSubjectRow = memo(function HomeSubjectRow({
             />
           </View>
 
-          <View className="flex-1 gap-0.5">
+          <View className="min-w-0 flex-1 gap-0.5">
             <Text variant="subheading" numberOfLines={1}>
               {subject.name}
             </Text>

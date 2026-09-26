@@ -2,6 +2,7 @@ import { memo } from "react"
 
 import type { MemberSettings } from "@/lib/member/settings"
 import { Text } from "@/components/ui/text"
+
 import { SettingsStepperRow, SettingsSwitchRow } from "./settings-rows"
 import { SettingsSection } from "./settings-section"
 
@@ -95,10 +96,7 @@ export const NotificationSection = memo(function NotificationSection({
   onChange,
 }: NotificationSectionProps) {
   return (
-    <SettingsSection
-      title="Notifications"
-      description="What we may send you."
-    >
+    <SettingsSection title="Notifications" description="What we may send you.">
       <SettingsSwitchRow
         label="Announcements"
         description="Board exam dates, new papers, results."

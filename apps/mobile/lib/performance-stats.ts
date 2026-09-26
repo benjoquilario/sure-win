@@ -1,5 +1,3 @@
-import { COLLECTIONS, DB_ID, Query, tablesDB } from "./appwrite"
-import { countRows, listAll } from "./db"
 import type {
   LearningAchievementDocument,
   SubjectDocument,
@@ -8,6 +6,13 @@ import type {
   UserProgressDocument,
   UserWeeklyReportDocument,
 } from "@workspace/schema"
+
+import { COLLECTIONS, DB_ID, Query, tablesDB } from "./appwrite"
+import {
+  countBankViaGateway,
+  isGatewayConfigured,
+} from "./content/exam-gateway"
+import { countRows, listAll } from "./db"
 import {
   GLOBAL_PROGRESS_SUBJECT_ID,
   GLOBAL_PROGRESS_TOPIC_ID,
@@ -297,7 +302,12 @@ async function listUserProgressRows(userId: string) {
  * which is fine on a card and wrong as a denominator (gotcha 9).
  */
 function getQuestionBankTotal() {
-  return countRows("questions", [])
+  // The table is server-only once the Function is rolled out; the Function
+  // also leaves out unpublished categories and sets, which the raw count
+  // included.
+  return isGatewayConfigured()
+    ? countBankViaGateway()
+    : countRows("questions", [])
 }
 
 function computeBestStreak(answerRows: UserAnswerDocument[]) {
@@ -402,7 +412,9 @@ function buildSubjectBreakdown(
     }
   }
 
-  return breakdown.sort((left, right) => right.correctPercent - left.correctPercent)
+  return breakdown.sort(
+    (left, right) => right.correctPercent - left.correctPercent
+  )
 }
 
 function getWeekBuckets(offset: number): TimelineBucketConfig {
@@ -529,7 +541,10 @@ function buildDashboardSnapshot(
   label: string,
   rows: UserDailyActivityDocument[]
 ): DashboardSnapshot {
-  const answeredCount = rows.reduce((total, row) => total + row.answeredCount, 0)
+  const answeredCount = rows.reduce(
+    (total, row) => total + row.answeredCount,
+    0
+  )
   const correctCount = rows.reduce((total, row) => total + row.correctCount, 0)
   const incorrectCount = rows.reduce(
     (total, row) => total + row.incorrectCount,
@@ -545,7 +560,9 @@ function buildDashboardSnapshot(
     0
   )
   const accuracyRate =
-    answeredCount > 0 ? Math.round((correctCount / answeredCount) * 10000) / 100 : 0
+    answeredCount > 0
+      ? Math.round((correctCount / answeredCount) * 10000) / 100
+      : 0
 
   return {
     label,
@@ -558,7 +575,9 @@ function buildDashboardSnapshot(
     earnedAchievementsCount,
     activeDaysCount: rows.filter(
       (row) =>
-        row.answeredCount > 0 || row.studyMinutes > 0 || row.completedMaterials > 0
+        row.answeredCount > 0 ||
+        row.studyMinutes > 0 ||
+        row.completedMaterials > 0
     ).length,
     averageScore: accuracyRate,
   }
@@ -604,13 +623,17 @@ function buildTrendSnapshot(params: {
   current: DashboardSnapshot
   previous: DashboardSnapshot
 }): DashboardTrendSnapshot {
-  const answeredDelta = params.current.answeredCount - params.previous.answeredCount
+  const answeredDelta =
+    params.current.answeredCount - params.previous.answeredCount
   const accuracyDelta =
-    Math.round((params.current.accuracyRate - params.previous.accuracyRate) * 100) /
-    100
-  const studyMinutesDelta = params.current.studyMinutes - params.previous.studyMinutes
+    Math.round(
+      (params.current.accuracyRate - params.previous.accuracyRate) * 100
+    ) / 100
+  const studyMinutesDelta =
+    params.current.studyMinutes - params.previous.studyMinutes
   const achievementsDelta =
-    params.current.earnedAchievementsCount - params.previous.earnedAchievementsCount
+    params.current.earnedAchievementsCount -
+    params.previous.earnedAchievementsCount
   const activeDaysDelta =
     params.current.activeDaysCount - params.previous.activeDaysCount
 
@@ -625,12 +648,7 @@ function buildTrendSnapshot(params: {
     studyMinutesDelta,
     achievementsDelta,
     activeDaysDelta,
-    trend:
-      answeredDelta > 0
-        ? "up"
-        : answeredDelta < 0
-          ? "down"
-          : "flat",
+    trend: answeredDelta > 0 ? "up" : answeredDelta < 0 ? "down" : "flat",
   }
 }
 
@@ -702,10 +720,16 @@ export async function getQuestionsAnsweredTimeline(
 
     if (row.answeredCount > mostAnsweredInOneDay) {
       mostAnsweredInOneDay = row.answeredCount
-      mostAnsweredDate = formatDateShort(new Date(`${row.activityDate}T00:00:00`))
+      mostAnsweredDate = formatDateShort(
+        new Date(`${row.activityDate}T00:00:00`)
+      )
     }
 
-    const bucketKey = getTimelineBucketKey(window, row.activityDate, bucketConfig)
+    const bucketKey = getTimelineBucketKey(
+      window,
+      row.activityDate,
+      bucketConfig
+    )
     if (!bucketKey) {
       continue
     }
@@ -724,7 +748,10 @@ export async function getQuestionsAnsweredTimeline(
     window,
     points,
     rangeLabel: bucketConfig.rangeLabel,
-    questionsThisPeriod: points.reduce((total, point) => total + point.value, 0),
+    questionsThisPeriod: points.reduce(
+      (total, point) => total + point.value,
+      0
+    ),
     mostAnsweredInOneDay,
     mostAnsweredDate,
     offset,
@@ -755,7 +782,9 @@ export async function getDashboardReportMetrics(
     ) ?? null
 
   const todayRows = dailyRows.filter((row) => row.activityDate === todayKey)
-  const weekRows = dailyRows.filter((row) => row.weekStartDate === currentWeekStart)
+  const weekRows = dailyRows.filter(
+    (row) => row.weekStartDate === currentWeekStart
+  )
   const monthRows = filterRowsByMonth(
     dailyRows,
     today.getFullYear(),
@@ -792,14 +821,17 @@ export async function getDashboardReportMetrics(
         ).length,
       achievementsCount:
         globalProgress?.achievementsCount ??
-        dailyRows.reduce((total, row) => total + row.earnedAchievementsCount, 0),
+        dailyRows.reduce(
+          (total, row) => total + row.earnedAchievementsCount,
+          0
+        ),
       weeklyAverageScore: globalProgress?.weeklyAverageScore ?? 0,
       dayStreak: globalProgress?.dayStreak ?? 0,
       accuracyRate:
         lifetimeAnsweredCount > 0
           ? Math.round((lifetimeCorrectCount / lifetimeAnsweredCount) * 10000) /
             100
-          : globalProgress?.accuracyRate ?? 0,
+          : (globalProgress?.accuracyRate ?? 0),
       answeredCount: lifetimeAnsweredCount,
       correctCount: lifetimeCorrectCount,
       incorrectCount: lifetimeIncorrectCount,
@@ -885,10 +917,18 @@ export async function getDashboardInsights(
       )
 
   const currentMonthDate = new Date(today.getFullYear(), today.getMonth(), 1)
-  const previousMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+  const previousMonthDate = new Date(
+    today.getFullYear(),
+    today.getMonth() - 1,
+    1
+  )
   const currentMonthSnapshot = buildDashboardSnapshot(
     "This Month",
-    filterRowsByMonth(dailyRows, currentMonthDate.getFullYear(), currentMonthDate.getMonth())
+    filterRowsByMonth(
+      dailyRows,
+      currentMonthDate.getFullYear(),
+      currentMonthDate.getMonth()
+    )
   )
   const previousMonthSnapshot = buildDashboardSnapshot(
     "Last Month",

@@ -5,6 +5,8 @@ import { Alert, Pressable, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { MemberType } from "@workspace/schema"
+
+import { useContentPadding, useLayout } from "@/hooks/use-layout"
 import { Button } from "@/components/ui/button"
 import { FormField, Input } from "@/components/ui/input"
 import { Text } from "@/components/ui/text"
@@ -38,6 +40,8 @@ export default function WelcomeScreen() {
     profile?.schoolOrEmployer ?? ""
   )
   const [isSaving, setIsSaving] = useState(false)
+  const { isSmallPhone } = useLayout()
+  const { paddingHorizontal } = useContentPadding("reading")
 
   const goToApp = useCallback(() => router.replace("/(tabs)"), [router])
 
@@ -77,12 +81,28 @@ export default function WelcomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView
-        contentContainerClassName="flex-1 gap-6 px-6 pb-8 pt-6"
+        contentContainerClassName="gap-6 pb-8 pt-6"
+        // flexGrow, not flex: the spacer below pushes the actions down on a
+        // tall screen, but a short one (or an open keyboard) must still scroll.
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: Math.max(paddingHorizontal, isSmallPhone ? 0 : 24),
+        }}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-2">
           <Text variant="eyebrow">One quick question</Text>
-          <Text className="text-3xl font-black leading-9 text-foreground">
+          <Text
+            role="heading"
+            className={
+              isSmallPhone
+                ? "text-2xl font-extrabold text-foreground"
+                : "text-3xl font-extrabold text-foreground"
+            }
+          >
             Where are you in your journey?
           </Text>
           <Text variant="callout" className="text-muted-foreground">
@@ -121,7 +141,12 @@ export default function WelcomeScreen() {
             <Text>{isSaving ? "Saving…" : "Continue"}</Text>
           </Button>
 
-          <Pressable onPress={goToApp} hitSlop={8} className="items-center">
+          <Pressable
+            role="button"
+            onPress={goToApp}
+            hitSlop={8}
+            className="min-h-11 items-center justify-center self-center px-3 web:hover:opacity-80"
+          >
             <Text className="text-sm font-bold text-muted-foreground">
               Skip for now
             </Text>

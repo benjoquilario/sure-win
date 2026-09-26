@@ -51,7 +51,7 @@ export const MaterialRow = memo(function MaterialRow({
       accessibilityRole="button"
       accessibilityLabel={`${position}. ${material.title}.${isLocked ? " Premium." : showStatus ? ` ${presentation.label}.` : ""}`}
       className={cn(
-        "flex-row items-start gap-3 px-4 py-3.5 active:bg-muted/50",
+        "flex-row items-start gap-3 px-4 py-3.5 active:bg-muted/50 web:hover:bg-muted/40",
         !isFirst && "border-t border-border/70"
       )}
       onPress={() => onPress(material)}
@@ -74,12 +74,14 @@ export const MaterialRow = memo(function MaterialRow({
         )}
       </View>
 
-      <View className="flex-1 gap-1">
+      <View className="min-w-0 flex-1 gap-1">
         <Text variant="callout" className="font-bold" numberOfLines={2}>
           {material.title}
         </Text>
 
-        <View className="flex-row items-center gap-1.5">
+        {/* Wraps rather than clips: "In progress · 45%" beside the type does
+            not fit on one line of a 320pt phone. */}
+        <View className="flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <MaterialTypeIcon size={12} type={material.type} color={typeColor} />
           <Text variant="label">{material.type}</Text>
 

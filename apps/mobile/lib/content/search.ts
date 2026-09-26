@@ -1,6 +1,7 @@
 import { Query } from "../appwrite"
 import { listPage } from "../db"
 import type { ContentViewer } from "./access"
+import { isGatewayConfigured, searchQuestionsViaGateway } from "./exam-gateway"
 
 /**
  * ─── Search ───────────────────────────────────────────────────────────────
@@ -31,11 +32,7 @@ export const MIN_SEARCH_LENGTH = 3
 const RESULTS_PER_TABLE = 12
 
 export type SearchResultKind =
-  | "question"
-  | "material"
-  | "subject"
-  | "topic"
-  | "category"
+  "question" | "material" | "subject" | "topic" | "category"
 
 export type SearchResult = {
   kind: SearchResultKind
@@ -99,9 +96,24 @@ async function searchQuestions(
   term: string,
   viewer: ContentViewer
 ): Promise<SearchResult[]> {
-  // Entitlement is not something the index knows. A member who is not paying
-  // gets the free samples only — the same restriction the session pool applies,
-  // for the same reason: the app should not hand out what it is selling.
+  // With the Function configured the server does the whole job: published
+  // categories and sets only, and only what this member is entitled to.
+  if (isGatewayConfigured()) {
+    const hits = await searchQuestionsViaGateway(term, RESULTS_PER_TABLE)
+
+    return hits.map((hit) => ({
+      kind: "question" as const,
+      id: hit.id,
+      title: truncate(hit.prompt),
+      subtitle: hit.isFree ? "Free sample" : hit.difficulty || "Question",
+      categoryId: hit.categoryId,
+      questionnaireId: hit.questionnaireId,
+    }))
+  }
+
+  // Direct path (development, before the Function exists). Entitlement is not
+  // something the index knows, so a member who is not paying gets the free
+  // samples only. Publish state is checked when a result is opened.
   const { rows } = await listPage(
     "questions",
     [
@@ -270,17 +282,23 @@ export async function searchContent(params: {
   const wantsQuestions = scope === "all" || scope === "questions"
   const wantsLibrary = scope === "all" || scope === "library"
 
-  const [questions, materialsByTitle, materialsByText, subjects, topics, categories] =
-    await Promise.all([
-      wantsQuestions ? searchQuestions(term, params.viewer) : [],
-      wantsLibrary ? searchMaterials(term, params.viewer, "title") : [],
-      wantsLibrary && params.includeLessonText
-        ? searchMaterials(term, params.viewer, "content")
-        : [],
-      wantsLibrary ? searchSubjects(term) : [],
-      wantsLibrary ? searchTopics(term) : [],
-      wantsQuestions ? searchCategories(term, params.viewer) : [],
-    ])
+  const [
+    questions,
+    materialsByTitle,
+    materialsByText,
+    subjects,
+    topics,
+    categories,
+  ] = await Promise.all([
+    wantsQuestions ? searchQuestions(term, params.viewer) : [],
+    wantsLibrary ? searchMaterials(term, params.viewer, "title") : [],
+    wantsLibrary && params.includeLessonText
+      ? searchMaterials(term, params.viewer, "content")
+      : [],
+    wantsLibrary ? searchSubjects(term) : [],
+    wantsLibrary ? searchTopics(term) : [],
+    wantsQuestions ? searchCategories(term, params.viewer) : [],
+  ])
 
   // A lesson whose title and body both match is one result, not two — and the
   // title hit is the better one, so it wins the position.

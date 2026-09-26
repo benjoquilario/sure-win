@@ -1,6 +1,7 @@
-import { assertContentConfigured, getRowSafe, listAll } from "../db"
-import { Query } from "../appwrite"
 import type { ExamCategoryDocument, QuestionnaireMode } from "@workspace/schema"
+
+import { Query } from "../appwrite"
+import { assertContentConfigured, getRowSafe, listAll } from "../db"
 import { canOpenCategory, type ContentViewer } from "./access"
 
 /**
@@ -30,6 +31,11 @@ export type ExamCategory = {
   /** Items sitting directly under the category, outside any set. */
   directQuestionCount: number
   isLocked: boolean
+  isPublished: boolean
+  /** Pass mark in percent, or null for the app default. Sets can override it. */
+  passingScore: number | null
+  /** Minutes for the whole paper, or null to size the timer by item count. */
+  timeLimitMinutes: number | null
 }
 
 /**
@@ -78,6 +84,15 @@ export function toExamCategory(
     setCount: row.setCount ?? 0,
     directQuestionCount: row.directQuestionCount ?? 0,
     isLocked: !canOpenCategory({ isPremium }, viewer),
+    isPublished: row.isPublished === true,
+    passingScore:
+      typeof row.passingScore === "number" && row.passingScore > 0
+        ? row.passingScore
+        : null,
+    timeLimitMinutes:
+      typeof row.timeLimitMinutes === "number" && row.timeLimitMinutes > 0
+        ? row.timeLimitMinutes
+        : null,
   }
 }
 
@@ -128,7 +143,10 @@ export async function getExamCategory(
 
   const row = await getRowSafe("exam_categories", categoryId)
 
-  return row ? toExamCategory(row, viewer) : null
+  // A hidden category reads as missing. The listing already filters on
+  // `isPublished`, but a deep link, a search hit or a "Continue" card reaches
+  // this by id, and those must not reopen something the team took down.
+  return row && row.isPublished === true ? toExamCategory(row, viewer) : null
 }
 
 /**

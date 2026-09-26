@@ -3,9 +3,9 @@ import ChevronRight from "lucide-react-native/icons/chevron-right"
 import Compass from "lucide-react-native/icons/compass"
 import { Pressable, View } from "react-native"
 
-import { withOpacity } from "@/lib/theme"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Text } from "@/components/ui/text"
+
 import { SettingsSection } from "./settings-section"
 
 /**
@@ -39,12 +39,9 @@ export const HelpSection = memo(function HelpSection({
         accessibilityRole="button"
         accessibilityLabel="How this app works"
         accessibilityHint="Replays the introduction slides"
-        className="min-h-[56px] flex-row items-center gap-3 rounded-md px-1 py-2 active:opacity-80"
+        className="-mx-2 min-h-14 flex-row items-center gap-3 rounded-md px-2 py-2 active:bg-muted/60 web:hover:bg-muted/60"
       >
-        <View
-          className="h-9 w-9 items-center justify-center rounded-full"
-          style={{ backgroundColor: withOpacity(theme.primary, 0.1) }}
-        >
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-primary/10">
           <Compass size={16} color={theme.primary} strokeWidth={2.2} />
         </View>
 

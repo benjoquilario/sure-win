@@ -1,6 +1,10 @@
+import {
+  normalizeSetCode,
+  type QuestionnaireRowDocument,
+} from "@workspace/schema"
+
 import { Query } from "../appwrite"
 import { assertContentConfigured, getRowSafe, listAll } from "../db"
-import { normalizeSetCode, type QuestionnaireRowDocument } from "@workspace/schema"
 
 /**
  * ─── Sets ─────────────────────────────────────────────────────────────────
@@ -14,6 +18,13 @@ import { normalizeSetCode, type QuestionnaireRowDocument } from "@workspace/sche
  * five letters breaks on the sixth set.
  */
 
+/**
+ * Route id for "the questions directly under the category" when that
+ * category also has sets. Appwrite ids cannot start with an underscore, so
+ * this can never collide with a real set.
+ */
+export const DIRECT_SET_ID = "_direct"
+
 export type QuestionSet = {
   id: string
   categoryId: string
@@ -26,6 +37,11 @@ export type QuestionSet = {
   order: number
   /** Denormalised; accurate as of the last CMS write (gotcha 9). */
   questionCount: number
+  isPublished: boolean
+  /** null means "use the category's". */
+  passingScore: number | null
+  /** null means "use the category's". */
+  timeLimitMinutes: number | null
 }
 
 export function toQuestionSet(row: QuestionnaireRowDocument): QuestionSet {
@@ -41,6 +57,15 @@ export function toQuestionSet(row: QuestionnaireRowDocument): QuestionSet {
     description: row.description?.trim() ?? "",
     order: row.order ?? 1,
     questionCount: row.questionCount ?? 0,
+    isPublished: row.isPublished === true,
+    passingScore:
+      typeof row.passingScore === "number" && row.passingScore > 0
+        ? row.passingScore
+        : null,
+    timeLimitMinutes:
+      typeof row.timeLimitMinutes === "number" && row.timeLimitMinutes > 0
+        ? row.timeLimitMinutes
+        : null,
   }
 }
 
@@ -77,7 +102,9 @@ export async function getQuestionSet(
 
   const row = await getRowSafe("questionnaires", setId)
 
-  return row ? toQuestionSet(row) : null
+  // Sets default to unpublished so a half-finished one never reaches
+  // students; that only holds if opening one by id checks it too.
+  return row && row.isPublished === true ? toQuestionSet(row) : null
 }
 
 /** Sets by ID in one request — for history rows that name a set. */

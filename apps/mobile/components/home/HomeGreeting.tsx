@@ -1,6 +1,7 @@
 import { memo } from "react"
 import { View } from "react-native"
 
+import { useLayout } from "@/hooks/use-layout"
 import { Text } from "@/components/ui/text"
 
 type HomeGreetingProps = {
@@ -21,6 +22,13 @@ export const HomeGreeting = memo(function HomeGreeting({
   firstName,
   salutation,
 }: HomeGreetingProps) {
+  // One step down the ramp on a 320pt phone, where 3xl sets the promise over
+  // four lines and pushes the countdown below the fold.
+  const { isSmallPhone } = useLayout()
+  const headlineClass = isSmallPhone
+    ? "text-2xl font-extrabold"
+    : "text-3xl font-extrabold leading-10"
+
   return (
     <View className="gap-1">
       <Text variant="callout" className="text-muted-foreground">
@@ -32,12 +40,10 @@ export const HomeGreeting = memo(function HomeGreeting({
       <Text
         role="heading"
         aria-level="1"
-        className="text-3xl font-extrabold leading-10 text-foreground"
+        className={`${headlineClass} text-foreground`}
       >
         Your Board Exam Success{" "}
-        <Text className="text-3xl font-extrabold leading-10 text-primary">
-          Starts Here.
-        </Text>
+        <Text className={`${headlineClass} text-primary`}>Starts Here.</Text>
       </Text>
 
       <Text variant="callout" className="mt-1 text-muted-foreground">

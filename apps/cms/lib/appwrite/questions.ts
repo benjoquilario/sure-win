@@ -689,9 +689,12 @@ function toQuestionData(row: ParsedQuestionRow, target: QuestionTarget) {
 /**
  * Diffs a parsed file against what is already in the target.
  *
- * Matching is by item number, not by row position or by prompt text: it is the
- * only key an encoder controls and can see, so "row 12 updates question 12"
- * stays true even after they sort the sheet or fix a typo in the wording.
+ * Matching is by SKU and nothing else. A row carrying a SKU from this target
+ * updates that question and keeps its current item number; a row with a blank
+ * SKU is a new question, placed at its own No when that number is free and at
+ * the end otherwise; a SKU from somewhere else is reported, not guessed at.
+ * Item numbers are never used to match, because they move whenever someone
+ * sorts or renumbers a sheet - see the note above `ImportPlanEntry`.
  */
 export async function planQuestionImport(
   categoryId: string,
@@ -885,6 +888,34 @@ async function countRows(queries: string[]) {
   return Number(response.total ?? 0);
 }
 
+/*
+ * Live counts for the guards that refuse to orphan questions.
+ *
+ * These deliberately ignore the cached `questionCount`/`setCount` columns. A
+ * counter is only as fresh as the last sync, `setCount` only counts published
+ * sets, and the question a guard misses is the one left pointing at a set that
+ * no longer exists - invisible in the dashboard and still served to the app.
+ */
+export async function countQuestionsInSet(setId: string) {
+  return countRows([Query.equal("questionnaireId", [setId])]);
+}
+
+export async function countQuestionsInCategory(categoryId: string) {
+  return countRows([Query.equal("categoryId", [categoryId])]);
+}
+
+export async function countSetsInCategory(categoryId: string) {
+  const { tables } = getAdminServices();
+  const response = await tables.listRows({
+    databaseId: appwriteEnv.databaseId,
+    tableId: SETS_TABLE,
+    queries: [Query.equal("categoryId", [categoryId]), Query.limit(1)],
+    total: true,
+  });
+
+  return Number(response.total ?? 0);
+}
+
 /**
  * Recounts a target and writes the totals back.
  *
@@ -995,6 +1026,62 @@ export type QuestionInput = {
   isFree: boolean;
 };
 
+/**
+ * Moves an existing question into another category or set.
+ *
+ * The item number has to be re-chosen, because `idx_question_target_order`
+ * makes numbers unique per destination: keeping item 12 from Set A would 409
+ * the moment Set B already has a 12. Same answer as a concurrent import - read
+ * the next free number, and on a collision simply take the one after - so two
+ * people moving questions into the same set at once both land.
+ *
+ * @param preferredOrder A number the editor asked for, used only when it is
+ *   free in the destination. Null means "put it at the end".
+ * @returns The item number the question ended up with.
+ */
+async function moveQuestionToTarget(
+  rowId: string,
+  data: Record<string, unknown>,
+  target: QuestionTarget,
+  preferredOrder: number | null,
+  attempts = 8,
+): Promise<number> {
+  const { tables } = getAdminServices();
+  const taken = new Set(
+    (await listQuestionRecords(target)).map((record) =>
+      Number(record.order ?? 0),
+    ),
+  );
+  let nextOrder = Math.max(0, ...taken) + 1;
+  let order =
+    preferredOrder !== null && preferredOrder > 0 && !taken.has(preferredOrder)
+      ? preferredOrder
+      : nextOrder++;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await tables.updateRow({
+        databaseId: appwriteEnv.databaseId,
+        tableId: QUESTIONS_TABLE,
+        rowId,
+        data: { ...data, order },
+      });
+
+      return order;
+    } catch (error) {
+      if (!isConflict(error)) {
+        throw error;
+      }
+
+      lastError = error;
+      order = nextOrder++;
+    }
+  }
+
+  throw lastError ?? new Error("Could not find a free item number.");
+}
+
 export async function saveQuestionRecord(
   rowId: string | null,
   input: QuestionInput,
@@ -1004,6 +1091,15 @@ export async function saveQuestionRecord(
 
   if (!resolved) {
     throw new Error("Pick the exam category this question belongs to.");
+  }
+
+  // `resolveTarget` drops a set that is not in the category, which is right for
+  // a stale URL but wrong here: saving would quietly file the question directly
+  // under the category when the editor clearly asked for a set.
+  if (input.setId && !resolved.set) {
+    throw new Error(
+      "That set is not part of the chosen exam category. Pick the set again, or leave it blank to put the question directly under the category.",
+    );
   }
 
   const data = {
@@ -1027,16 +1123,66 @@ export async function saveQuestionRecord(
   };
 
   if (rowId) {
-    await tables.updateRow({
-      databaseId: appwriteEnv.databaseId,
-      tableId: QUESTIONS_TABLE,
+    const existing = await getQuestionRecord(rowId);
+
+    if (!existing) {
+      throw new Error(
+        "This question no longer exists. Someone may have deleted it while you were editing.",
+      );
+    }
+
+    const previous: QuestionTarget = {
+      categoryId: String(existing.categoryId ?? "").trim(),
+      setId: String(existing.questionnaireId ?? "").trim() || null,
+    };
+    const moved =
+      previous.categoryId !== resolved.target.categoryId ||
+      previous.setId !== resolved.target.setId;
+    const sku = String(existing.sku ?? "");
+
+    if (!moved) {
+      try {
+        await tables.updateRow({
+          databaseId: appwriteEnv.databaseId,
+          tableId: QUESTIONS_TABLE,
+          rowId,
+          data,
+        });
+      } catch (error) {
+        if (isConflict(error)) {
+          throw new Error(
+            `Item ${data.order} is already used in ${resolved.label}. Pick another number.`,
+          );
+        }
+
+        throw error;
+      }
+
+      await syncQuestionCounts(resolved.target);
+
+      return { id: rowId, sku, order: data.order };
+    }
+
+    const order = await moveQuestionToTarget(
       rowId,
       data,
-    });
+      resolved.target,
+      // An unchanged number is the one it had in the OLD place, which says
+      // nothing about where it belongs in the new one - so it goes to the end.
+      // A number the editor deliberately changed is honoured if it is free.
+      input.order !== Number(existing.order ?? 0) ? input.order : null,
+    );
 
+    // Both ends changed. Recounting only the destination would leave the old
+    // set - and, across categories, the old category - claiming a question it
+    // no longer has.
     await syncQuestionCounts(resolved.target);
 
-    return { id: rowId, sku: "" };
+    if (previous.categoryId) {
+      await syncQuestionCounts(previous);
+    }
+
+    return { id: rowId, sku, order };
   }
 
   let nextSequence = await peekNextSkuSequence();

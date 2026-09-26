@@ -10,10 +10,15 @@ import {
   useExamQuestions,
   useResumableSession,
 } from "@/hooks/use-exam-content"
+import { useContentPadding } from "@/hooks/use-layout"
 import { useMemberSettings } from "@/hooks/use-member-settings"
+import { Button } from "@/components/ui/button"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
+
 import { LockedPaper } from "./locked-paper"
 import {
   SessionSetupPanel,
@@ -38,6 +43,9 @@ type PaperSetupScreenProps = {
 export function PaperSetupScreen({ category, set }: PaperSetupScreenProps) {
   const router = useRouter()
   const { settings, isLoading: isLoadingSettings } = useMemberSettings()
+  // A setup form reads best at a measured width; on a tablet the choices
+  // would otherwise stretch into rows too long to scan.
+  const readingPadding = useContentPadding("reading")
 
   const questionsQuery = useExamQuestions({
     categoryId: category.id,
@@ -106,11 +114,13 @@ export function PaperSetupScreen({ category, set }: PaperSetupScreenProps) {
     return (
       <SafeAreaView
         edges={["left", "right", "bottom"]}
-        className="flex-1 gap-3 bg-background px-4 py-4"
+        className="flex-1 bg-background py-4"
       >
-        <Skeleton className="h-24 rounded-xl" />
-        <Skeleton className="h-40 rounded-xl" />
-        <Skeleton className="h-40 rounded-xl" />
+        <ContentFrame width="reading" className="gap-3">
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-40 rounded-xl" />
+          <Skeleton className="h-40 rounded-xl" />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -119,17 +129,28 @@ export function PaperSetupScreen({ category, set }: PaperSetupScreenProps) {
     return (
       <SafeAreaView
         edges={["left", "right", "bottom"]}
-        className="flex-1 bg-background px-4 py-4"
+        className="flex-1 bg-background py-4"
       >
-        <EmptyState
-          tone="destructive"
-          title="Questions unavailable"
-          description={
-            questionsQuery.error instanceof Error
-              ? questionsQuery.error.message
-              : "We could not load this paper. Please try again."
-          }
-        />
+        <ContentFrame width="reading">
+          <EmptyState
+            tone="destructive"
+            title="Questions unavailable"
+            description={
+              questionsQuery.error instanceof Error
+                ? questionsQuery.error.message
+                : "We could not load this paper. Please try again."
+            }
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => void questionsQuery.refetch()}
+              >
+                <Text>Try again</Text>
+              </Button>
+            }
+          />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -140,7 +161,11 @@ export function PaperSetupScreen({ category, set }: PaperSetupScreenProps) {
       className="flex-1 bg-background"
     >
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+        contentContainerStyle={{
+          ...readingPadding,
+          paddingTop: 16,
+          paddingBottom: 40,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {availableCount === 0 && questionsQuery.hiddenCount > 0 ? (

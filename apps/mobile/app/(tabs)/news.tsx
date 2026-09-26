@@ -5,7 +5,9 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { Announcement } from "@/lib/announcements"
 import { useAnnouncements } from "@/hooks/use-announcements"
+import { useContentPadding } from "@/hooks/use-layout"
 import { Card, CardContent } from "@/components/ui/card"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AnnouncementCard } from "@/components/announcement-card"
@@ -22,7 +24,14 @@ import { AppShellHeader } from "@/components/app-shell-header"
  * writes the first announcement in the dashboard. That case gets a real empty
  * state rather than filler, because inventing news to fill a screen is how a
  * feed stops being worth opening.
+ *
+ * Laid out at the reading width: an announcement is a paragraph of markdown,
+ * and on a tablet or a browser it would otherwise run the full window wide.
  */
+
+function AnnouncementSeparator() {
+  return <View className="h-3" />
+}
 
 const AnnouncementSkeleton = () => (
   <Card>
@@ -38,6 +47,7 @@ const AnnouncementSkeleton = () => (
 export default function NewsScreen() {
   const { announcements, isLoading, error, unreadIds, markAllSeen } =
     useAnnouncements()
+  const contentPadding = useContentPadding("reading")
 
   // Captured on entry, before `markAllSeen` clears it — so the dots stay
   // visible while they read instead of vanishing under them on mount.
@@ -58,13 +68,16 @@ export default function NewsScreen() {
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<Announcement>) => (
-      <AnnouncementCard announcement={item} isUnread={unreadOnEntry.has(item.id)} />
+      <AnnouncementCard
+        announcement={item}
+        isUnread={unreadOnEntry.has(item.id)}
+      />
     ),
     [unreadOnEntry]
   )
 
   const header = (
-    <View className="px-4 pb-4 pt-4">
+    <View className="pb-5 pt-4">
       <AppShellHeader
         compact
         eyebrow="What is new"
@@ -76,22 +89,31 @@ export default function NewsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
-        {header}
-        <View className="gap-4 px-4">
-          <AnnouncementSkeleton />
-          <AnnouncementSkeleton />
-        </View>
+      <SafeAreaView
+        className="flex-1 bg-background"
+        edges={["top", "left", "right"]}
+      >
+        <ContentFrame width="reading">
+          {header}
+          <View className="gap-3">
+            <AnnouncementSkeleton />
+            <AnnouncementSkeleton />
+          </View>
+        </ContentFrame>
       </SafeAreaView>
     )
   }
 
   if (error) {
     return (
-      <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
-        {header}
-        <View className="px-4">
+      <SafeAreaView
+        className="flex-1 bg-background"
+        edges={["top", "left", "right"]}
+      >
+        <ContentFrame width="reading">
+          {header}
           <EmptyState
+            tone="destructive"
             title="Could not load updates"
             description={
               error instanceof Error
@@ -99,40 +121,40 @@ export default function NewsScreen() {
                 : "Check your connection and try again."
             }
           />
-        </View>
+        </ContentFrame>
       </SafeAreaView>
     )
   }
 
   if (announcements.length === 0) {
     return (
-      <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
-        {header}
-        <View className="px-4">
+      <SafeAreaView
+        className="flex-1 bg-background"
+        edges={["top", "left", "right"]}
+      >
+        <ContentFrame width="reading">
+          {header}
           <EmptyState
             title="Nothing new yet"
             description="Announcements about new question sets and learning material will show up here."
           />
-        </View>
+        </ContentFrame>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView
+      className="flex-1 bg-background"
+      edges={["top", "left", "right"]}
+    >
       <FlashList
         data={announcements}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={header}
-        ItemSeparatorComponent={() => <View className="h-4" />}
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          // Clears the tab bar's raised Study button, which overhangs
-          // into this screen by 20px. The bar itself sits below the
-          // screen rather than over it, so its height needs no allowance.
-          paddingBottom: 32,
-        }}
+        ItemSeparatorComponent={AnnouncementSeparator}
+        contentContainerStyle={{ ...contentPadding, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>

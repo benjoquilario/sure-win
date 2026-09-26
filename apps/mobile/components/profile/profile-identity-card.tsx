@@ -7,7 +7,9 @@ import ShieldCheck from "lucide-react-native/icons/shield-check"
 import Trophy from "lucide-react-native/icons/trophy"
 import { Pressable, View } from "react-native"
 
-import { withOpacity, type ThemePalette } from "@/lib/theme"
+import type { ThemePalette } from "@/lib/theme"
+import { useLayout } from "@/hooks/use-layout"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Text } from "@/components/ui/text"
 import { CommunityAvatar } from "@/components/community/avatar"
@@ -56,6 +58,9 @@ export const ProfileIdentityCard = memo(function ProfileIdentityCard({
   dayStreak,
   onPressEdit,
 }: ProfileIdentityCardProps) {
+  // The 72pt avatar leaves a 320pt phone about 170pt for the name.
+  const { isSmallPhone } = useLayout()
+
   return (
     <Card>
       <CardContent className="gap-4">
@@ -63,13 +68,13 @@ export const ProfileIdentityCard = memo(function ProfileIdentityCard({
           accessibilityRole="button"
           accessibilityLabel={`${displayName}. ${roleLabel}. Edit your profile.`}
           onPress={onPressEdit}
-          className="flex-row items-center gap-4 active:opacity-80"
+          className="flex-row items-center gap-4 rounded-md active:opacity-80 web:hover:opacity-90"
         >
           <View>
             <CommunityAvatar
               label={initials}
               theme={theme}
-              size="xl"
+              size={isSmallPhone ? "lg" : "xl"}
               sourceUri={avatarUrl}
               className="rounded-full"
             />
@@ -94,20 +99,17 @@ export const ProfileIdentityCard = memo(function ProfileIdentityCard({
             ) : null}
           </View>
 
-          <View className="flex-1 gap-1.5">
+          <View className="min-w-0 flex-1 gap-1.5">
             <Text variant="title" numberOfLines={1}>
               {displayName}
             </Text>
 
-            <View
-              className="flex-row items-center gap-1.5 self-start rounded-full px-2.5 py-1"
-              style={{ backgroundColor: withOpacity(theme.primary, 0.12) }}
-            >
+            <Badge className="max-w-full">
               <ShieldCheck size={12} color={theme.primary} strokeWidth={2.6} />
-              <Text className="text-2xs font-bold text-primary">
+              <Text className="shrink font-bold" numberOfLines={1}>
                 {roleLabel}
               </Text>
-            </View>
+            </Badge>
 
             <Text
               variant="caption"

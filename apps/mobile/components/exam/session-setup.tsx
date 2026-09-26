@@ -38,7 +38,9 @@ export type SessionLengthOption = {
  * quietly truncated.
  */
 export function buildLengthOptions(
-  availableCount: number
+  availableCount: number,
+  /** The paper's own time limit from the CMS, when it has one. */
+  paperMinutes?: number | null
 ): SessionLengthOption[] {
   const presets: SessionLengthOption[] = [
     {
@@ -68,17 +70,21 @@ export function buildLengthOptions(
     (preset) => preset.questionCount <= availableCount
   )
 
+  // The real sitting's time limit when the CMS gives one; otherwise about
+  // 36 seconds an item, floored so a short paper still gets a usable timer.
+  const fullMinutes =
+    paperMinutes && paperMinutes > 0
+      ? paperMinutes
+      : Math.max(Math.round(availableCount * 0.6), 5)
+
   return [
     ...fitting,
     {
       id: "full",
       label: "Whole paper",
-      description: `${availableCount} items · ${Math.max(
-        Math.round(availableCount * 0.6),
-        5
-      )} minutes`,
+      description: `${availableCount} items · ${fullMinutes} minutes`,
       questionCount: availableCount,
-      minutes: Math.max(Math.round(availableCount * 0.6), 5),
+      minutes: fullMinutes,
     },
   ]
 }

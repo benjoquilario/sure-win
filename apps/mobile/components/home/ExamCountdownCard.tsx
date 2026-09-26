@@ -1,13 +1,15 @@
 import { memo } from "react"
+import { Image } from "expo-image"
 import CalendarDays from "lucide-react-native/icons/calendar-days"
 import ChevronRight from "lucide-react-native/icons/chevron-right"
 import Sparkles from "lucide-react-native/icons/sparkles"
-import { Image } from "expo-image"
 import { Pressable, View } from "react-native"
 
 import type { ExamCountdown } from "@/lib/exam-countdown"
 import type { ThemePalette } from "@/lib/theme"
 import { toSvgColor, withOpacity } from "@/lib/theme"
+import { cn } from "@/lib/utils"
+import { useLayout } from "@/hooks/use-layout"
 import { Text } from "@/components/ui/text"
 
 const GRADUATION_ART = require("../../assets/images/happy-graduation.webp")
@@ -34,7 +36,7 @@ function CountdownSurface({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      className="overflow-hidden rounded-2xl border border-primary/15 bg-primary/[0.07] active:opacity-90"
+      className="overflow-hidden rounded-2xl border border-primary/15 bg-primary/[0.07] active:opacity-90 web:hover:bg-primary/10"
     >
       {children}
     </Pressable>
@@ -53,6 +55,14 @@ export const ExamCountdownCard = memo(function ExamCountdownCard({
   countdown,
   onPress,
 }: ExamCountdownCardProps) {
+  // On a 320pt phone the full-size art leaves the digits about 150pt, which a
+  // three-digit count and its caption overrun. Smaller art, one step smaller
+  // numerals.
+  const { isSmallPhone } = useLayout()
+  const artSize = isSmallPhone
+    ? { box: 92, width: 84, height: 78 }
+    : { box: 124, width: 112, height: 104 }
+
   if (!countdown) {
     return (
       <CountdownSurface
@@ -68,7 +78,7 @@ export const ExamCountdownCard = memo(function ExamCountdownCard({
             />
           </View>
 
-          <View className="flex-1 gap-0.5">
+          <View className="min-w-0 flex-1 gap-0.5">
             <Text variant="subheading">Set your exam date</Text>
             <Text variant="caption">
               Track the countdown to your board exam.
@@ -91,7 +101,7 @@ export const ExamCountdownCard = memo(function ExamCountdownCard({
       onPress={onPress}
     >
       <View className="flex-row items-center">
-        <View className="flex-1 gap-2 py-4 pl-4">
+        <View className="min-w-0 flex-1 gap-2 py-4 pl-4">
           <View className="flex-row items-center gap-2.5">
             <View className="h-9 w-9 items-center justify-center rounded-md bg-primary">
               <CalendarDays
@@ -100,15 +110,24 @@ export const ExamCountdownCard = memo(function ExamCountdownCard({
                 strokeWidth={2.4}
               />
             </View>
-            <Text variant="caption" className="text-foreground/70">
+            <Text
+              variant="caption"
+              className="shrink text-foreground/70"
+              numberOfLines={1}
+            >
               Days until your exam
             </Text>
           </View>
 
           {/* Baseline-aligned so the unit reads as part of the number rather
               than a caption stacked under it. */}
-          <View className="flex-row items-baseline gap-2">
-            <Text className="text-5xl font-extrabold leading-[52px] text-primary">
+          <View className="flex-row flex-wrap items-baseline gap-x-2">
+            <Text
+              className={cn(
+                "font-extrabold text-primary",
+                isSmallPhone ? "text-4xl" : "text-5xl leading-[52px]"
+              )}
+            >
               {countdown.daysLabel}
             </Text>
             <Text variant="subheading" className="text-foreground/80">
@@ -119,7 +138,10 @@ export const ExamCountdownCard = memo(function ExamCountdownCard({
           <Text variant="caption">{countdown.scheduleLabel}</Text>
         </View>
 
-        <View className="relative h-[120px] w-[124px] items-center justify-center">
+        <View
+          className="relative items-center justify-center"
+          style={{ width: artSize.box, height: artSize.box - 4 }}
+        >
           <Sparkles
             size={16}
             // Lucide renders through react-native-svg, whose colour parser
@@ -134,7 +156,7 @@ export const ExamCountdownCard = memo(function ExamCountdownCard({
             source={GRADUATION_ART}
             contentFit="contain"
             accessible={false}
-            style={{ width: 112, height: 104 }}
+            style={{ width: artSize.width, height: artSize.height }}
           />
         </View>
       </View>

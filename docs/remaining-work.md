@@ -4,6 +4,11 @@ Written 2026-09-17, against `6827435`. Two questions: what does billing still
 need, and what is the actual flow for getting content in. Everything here was
 read out of the code; file:line references are so you can check any of it.
 
+Updated 2026-09-26: the paywall Function, the publish permissions, the SKU
+docs, safe moves and deletes, and the account-delete rewrite are done - each
+section says what is fixed and what, if anything, is still waiting on a
+rollout. Line numbers from the first pass may have drifted.
+
 The short version: the CMS and the backend are essentially finished. What is
 missing is almost entirely **outside** the code - Google Play console setup,
 credentials, and one unwritten piece of the mobile app.
@@ -91,22 +96,37 @@ is: member pays -> Google is told the purchase is good -> the grant throws ->
 member gets a 500 and no access, and the acknowledgement means it will not
 auto-refund. `subscription_plans` is empty today.
 
-**The paywall does not protect anything yet.** `questions` is
-`accessModel: "app_readonly"` (`packages/schema/src/schema.ts:2922`), which
-resolves to `read("users")` - every signed-in member can read every row in the
-paid bank, including `answerIndex` and `explanation`. The filtering in
-`apps/mobile/lib/content/questions.ts:251` (`applyQuestionPaywall`) runs in the
-app, so it is presentation, not enforcement. Anyone who queries Appwrite
-directly gets the lot.
+**The paywall - fixed in code, not yet rolled out.** It used to protect
+nothing: `questions` was `app_readonly`, so every signed-in member could read
+the whole paid bank, `answerIndex` and `explanation` included, and the app's
+own filtering was presentation, not enforcement. Appwrite cannot express
+"readable only where `isFree` is true, or where the reader pays", so the table
+could not simply be locked without taking the free samples down with it.
 
-This is known and deliberate - Appwrite cannot express "readable only where
-`isFree` is true", and locking the table would take the free samples down with
-it. The fix is a Function that serves questions, which is listed as unbuilt.
-Worth deciding on before charging for access, because it decides whether there
-is anything to charge for.
+That Function now exists: `functions/exam-questions/`. It runs with its own API
+key, serves only published categories and sets, and gives a member without
+active premium the `isFree` rows of a premium category and nothing else. The
+schema has moved `questions` to `accessModel: "server_only"` (see the comment
+on the table in `packages/schema/src/schema.ts`), so once bootstrapped, the
+Function is the only way in. **The order matters**, because bootstrapping
+removes `read("users")` and breaks any build still reading the table directly:
+
+1. Deploy `functions/exam-questions` and note its id.
+2. Set `EXPO_PUBLIC_APPWRITE_EXAM_QUESTIONS_FUNCTION_ID`, ship the build that
+   reads through the Function, and let it be adopted.
+3. Only then `pnpm appwrite:bootstrap`.
+
+Until step 3 the paywall is still the old one.
 
 **Account deletion blocks release.** Google Play requires a working deletion
-path. The function exists (`functions/account-delete/`) but
+path. `functions/account-delete/` has been rewritten: it now removes the
+member's rows from every member table (sessions, answers, progress, stats,
+achievements, bookmarks, blocks, likes, posts and their threads, comments,
+replies, reports, roles, both profiles) and keeps only the financial records
+and the staff audit trail - see its README. It was also moved to
+`node-appwrite` 22, the SDK the rest of the repo uses; the old `^14.1.0` pin
+predates the `TablesDB` API the function calls. (`community-post-like-toggle`
+and `premium-material-access` got the same bump.) What still blocks release:
 `EXPO_PUBLIC_APPWRITE_ACCOUNT_DELETE_FUNCTION_ID` is unset, so the app cannot
 call it.
 
@@ -174,20 +194,36 @@ Concurrency safety rests on a unique index on
 rather than serialising. Counts on `exam_categories` and `questionnaires` are
 recounted, never incremented.
 
-### Two places document SKU matching wrongly
+### SKU matching is now documented correctly (fixed)
 
-Both say item numbers identify a question on re-upload. They do not.
+Two places used to say item numbers identify a question on re-upload: the "How
+to fill this in" tab inside every downloaded workbook (`workbook.ts`), and the
+doc comment above `planQuestionImport` (`questions.ts`). Following the workbook
+- typing item numbers into a fresh sheet - silently duplicated the paper. Both
+now say what the code and the import card say: the SKU is the only match, a
+blank SKU creates, and the No column is reading order only.
 
-- `workbook.ts:291` - the "How to fill this in" tab inside **every downloaded
-  workbook**: *"Item numbers (No) identify a question when you upload the file
-  again: same number means update, new number means add."* This is the sentence
-  an encoder is most likely to read, and following it - typing item numbers into
-  a fresh sheet - silently duplicates the entire paper.
-- `questions.ts:692` - the doc comment above `planQuestionImport`, directly
-  above code that does the opposite.
+Item numbers are also parsed strictly now. `"1.5"` used to become 15 and `"-3"`
+became 3; anything but a whole number from 1 to 100000 (a trailing `.0` from an
+Excel numeric cell is fine) is now a row error on the No column.
 
-The on-screen copy in the import card is correct. **Worth fixing both before
-more encoders use this.**
+### Moving and deleting (fixed)
+
+- **Deleting a category or set is refused while anything is in it** - a set
+  with questions, a category with sets or questions - with a message saying
+  how many. It is refused rather than cascaded on purpose: one click should not
+  take a paper's SKUs and answer history with it. Counts are live queries, not
+  the cached counters.
+- **Moving a question** to another set or category takes the next free item
+  number there (or the number typed, if the editor changed it and it is free),
+  retries on a 409 like an import does, and recounts both the old and the new
+  place. A set that is not in the chosen category is an error, not silently
+  dropped.
+- **Moving a set** to another category is allowed only while it is empty; it
+  gets the next free letter in its new category and both categories are
+  recounted. A set with questions is refused.
+- Counters and other read-only fields are no longer echoed back by the record
+  form, and the server ignores them if they are sent.
 
 ### Images
 
@@ -208,7 +244,7 @@ Six roles. `student` and `member` both have zero dashboard access.
 
 | Role | Can |
 | --- | --- |
-| encoder | Create and edit questions and material, import, upload media. Cannot delete or see members/billing. |
+| encoder | Create and edit questions and material, import, upload media. Cannot publish, unpublish, delete, or see members/billing. |
 | moderator | Encoder plus delete, publish, moderate community, read members and billing. |
 | admin | Everything except `members.delete` and `billing.grant`. |
 | super_admin | Everything. Only role that can appoint admins. |
@@ -225,18 +261,35 @@ before going live.
 There is no draft -> review -> approved pipeline. Each row has an `isPublished`
 boolean:
 
-- `exam_categories.isPublished` - defaults **true**
+- `exam_categories.isPublished` - defaults **false** (it used to default true,
+  so an encoder's brand-new, empty category went live on save; existing rows
+  keep what they store)
 - `questionnaires.isPublished` - defaults **false** (so a half-finished set
   never reaches students)
 - `subjects` / `topics` / `learning_materials` - default true
 - `questions` - **no publish column.** Individual questions cannot be held back;
   they go live with their category.
 
-**`content.publish` and `questions.publish` are defined and granted to
-moderators, but checked nowhere in the codebase.** `isPublished` is an ordinary
-field gated by `*.edit` - so an encoder can publish, which contradicts the role
-summary in `schema.ts:316`. Either wire the permission up or correct the
-description.
+**The publish permissions are wired up (fixed).** `saveCmsRecord` now requires
+`questions.publish` to change `isPublished` on a category or set, and
+`content.publish` on a subject, topic or material (`getPublishPermission` in
+the schema). Only a *change* needs it - an encoder can still edit a live row -
+and creating a row already visible counts as a change. For someone without it,
+the form locks the switch, starting new rows hidden, so the defaults above do
+not trip them up.
+
+### Exam settings (schema only - the app does not read them yet)
+
+- `exam_categories` and `questionnaires` have optional `timeLimitMinutes`
+  (0-600; blank or 0 means the app's 0.6 minutes per item) and `passingScore`
+  (1-100; blank means 75). On a set, blank means "use the category's".
+- `study_sessions` has optional `questionLimit`, `timeLimitSeconds`,
+  `questionSource`, `difficultyFilter`, `shuffleQuestions` and
+  `shuffleChoices`, so an unfinished session can resume with exactly the
+  settings it started with.
+
+All are optional, so existing rows stay valid; they exist in Appwrite after the
+next `pnpm appwrite:bootstrap`.
 
 ### What the app relies on
 
@@ -255,14 +308,16 @@ Full contract: `docs/schema/MOBILE-SCHEMA-NOTES-v6.md`.
 
 ## 3. Everything else outstanding
 
-**Appwrite Functions.** Three exist (`account-delete`,
-`community-post-like-toggle`, `premium-material-access`) and each needs its own
-env vars set in the console - they do not share the CMS's. Unbuilt and listed in
-the notes: premium question access (see above), access code redemption, Play
-purchase verification wrapper.
+**Appwrite Functions.** Four exist (`account-delete`,
+`community-post-like-toggle`, `exam-questions`, `premium-material-access`) and
+each needs its own env vars set in the console - they do not share the CMS's.
+Unbuilt and listed in the notes: access code redemption, Play purchase
+verification wrapper.
 
 **Mobile env vars used in code but absent from `.env.example`:**
 `EXPO_PUBLIC_APPWRITE_ACCOUNT_DELETE_FUNCTION_ID`,
+`EXPO_PUBLIC_APPWRITE_EXAM_QUESTIONS_FUNCTION_ID` (new - the `exam-questions`
+Function; see the rollout order under Payments),
 `EXPO_PUBLIC_APPWRITE_ANDROID_PACKAGE`, `EXPO_PUBLIC_APPWRITE_IOS_BUNDLE_ID`,
 `EXPO_PUBLIC_APPWRITE_WEB_PLATFORM`, `EXPO_PUBLIC_APP_SCHEME`. The EAS
 production profile sets none of the Appwrite variables either - they have to
@@ -291,12 +346,11 @@ fewer than intended.
 
 1. Set `APPWRITE_CMS_SUPER_ADMIN_EMAILS` and deploy the CMS, so there is a way
    in.
-2. Fix the two wrong lines about SKU matching (`workbook.ts:291`,
-   `questions.ts:692`) - cheap, and prevents duplicated papers.
-3. Create exam categories, upload questions, publish. None of this needs
-   billing.
-4. Decide on the `questions` paywall. It determines whether premium is worth
-   selling.
+2. ~~Fix the two wrong lines about SKU matching~~ - done.
+3. Create exam categories, upload questions, publish (a moderator or above
+   publishes). None of this needs billing.
+4. Roll out the `questions` paywall in the order under Payments: deploy
+   `exam-questions`, ship the app with its function id, then bootstrap.
 5. Start the Play developer account - it gates everything else and takes the
    longest.
 6. Wire account deletion; Play will not accept a release without it.

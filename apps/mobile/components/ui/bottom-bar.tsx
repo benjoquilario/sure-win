@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { View, type ViewProps } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { CONTENT_MAX_WIDTH, type ContentWidth } from "@/lib/layout"
 import { cn } from "@/lib/utils"
 
 /**
@@ -36,6 +37,14 @@ type BottomBarProps = ViewProps & {
   minInset?: number
   /** Set false for a floating bar that should not draw a divider. */
   bordered?: boolean
+  /**
+   * Centre the controls at this content width. The bar still paints edge to
+   * edge; only its contents stop growing, so on a tablet the buttons line up
+   * with the column above instead of stretching across the screen.
+   */
+  width?: ContentWidth
+  /** Classes for the centred inner row, when `width` is set. */
+  contentClassName?: string
 }
 
 export function BottomBar({
@@ -44,6 +53,8 @@ export function BottomBar({
   style,
   minInset = 12,
   bordered = true,
+  width,
+  contentClassName,
   ...props
 }: BottomBarProps) {
   const insets = useSafeAreaInsets()
@@ -65,7 +76,16 @@ export function BottomBar({
       )}
       {...props}
     >
-      {children}
+      {width ? (
+        <View
+          className={cn("w-full self-center", contentClassName)}
+          style={{ maxWidth: CONTENT_MAX_WIDTH[width] }}
+        >
+          {children}
+        </View>
+      ) : (
+        children
+      )}
     </View>
   )
 }

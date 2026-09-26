@@ -4,8 +4,10 @@ import { View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { PresentedQuestion } from "@/lib/session/question-pool"
+import { useLayout } from "@/hooks/use-layout"
 import { Button } from "@/components/ui/button"
 import { Text } from "@/components/ui/text"
+
 import { SampleFinishedUpsell } from "./locked-paper"
 import { ResultReviewRow } from "./result-review-row"
 import { ResultSummary } from "./result-summary"
@@ -31,6 +33,8 @@ type SessionResultsProps = {
   showExplanations: boolean
   /** Items this member could not open. Drives the upsell below the score. */
   hiddenCount?: number
+  /** This paper's pass mark. */
+  passingScore?: number
   onDone: () => void
   onRetry?: () => void
   onUpgrade?: () => void
@@ -54,6 +58,7 @@ export const SessionResults = memo(function SessionResults({
   durationSeconds,
   showExplanations,
   hiddenCount = 0,
+  passingScore,
   onDone,
   onRetry,
   onUpgrade,
@@ -68,12 +73,14 @@ export const SessionResults = memo(function SessionResults({
   )
 
   const insets = useSafeAreaInsets()
+  // Reading width: the review rows carry full question text and explanations.
+  const paddingHorizontal = useLayout().paddingFor("reading")
   const listContentStyle = useMemo(
     () => ({
-      paddingHorizontal: 16,
+      paddingHorizontal,
       paddingBottom: insets.bottom + LIST_BOTTOM_GAP,
     }),
-    [insets.bottom]
+    [insets.bottom, paddingHorizontal]
   )
 
   const [filter, setFilter] = useState<ReviewFilter>(
@@ -110,6 +117,7 @@ export const SessionResults = memo(function SessionResults({
             questionCount={pool.length}
             answeredCount={answeredCount}
             durationSeconds={durationSeconds}
+            passingScore={passingScore}
           />
 
           {onUpgrade ? (
@@ -135,7 +143,7 @@ export const SessionResults = memo(function SessionResults({
             ) : null}
           </View>
 
-          <View className="flex-row items-center justify-between gap-2">
+          <View className="flex-row flex-wrap items-center justify-between gap-2">
             <Text variant="label">Review</Text>
 
             <View className="flex-row gap-2">

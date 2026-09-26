@@ -4,7 +4,6 @@ import Trash2 from "lucide-react-native/icons/trash-2"
 import TriangleAlert from "lucide-react-native/icons/triangle-alert"
 import { View } from "react-native"
 
-import { withOpacity } from "@/lib/theme"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -37,7 +36,11 @@ export const DangerZoneSection = memo(function DangerZoneSection({
     <Card className="border-destructive/25 bg-destructive/5">
       <CardContent className="gap-3">
         <View className="flex-row items-start gap-3">
-          <TriangleAlert size={18} color={theme.destructive} strokeWidth={2.3} />
+          <TriangleAlert
+            size={18}
+            color={theme.destructive}
+            strokeWidth={2.3}
+          />
           <View className="flex-1 gap-0.5">
             <Text variant="subheading">Danger zone</Text>
             <Text variant="caption">
@@ -50,13 +53,10 @@ export const DangerZoneSection = memo(function DangerZoneSection({
           variant="outline"
           disabled={isLoggingOut}
           onPress={onSignOut}
-          style={{
-            borderColor: withOpacity(theme.destructive, 0.35),
-            backgroundColor: withOpacity(theme.destructive, 0.07),
-          }}
+          className="border-destructive/35 bg-destructive/5 dark:border-destructive/35 dark:bg-destructive/10"
         >
           <LogOut size={16} color={theme.destructive} strokeWidth={2.2} />
-          <Text style={{ color: theme.destructive }} className="font-bold">
+          <Text className="font-bold text-destructive">
             {isLoggingOut ? "Signing out…" : "Sign out"}
           </Text>
         </Button>

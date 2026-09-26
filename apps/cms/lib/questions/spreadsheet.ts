@@ -703,7 +703,10 @@ export function parseQuestionRow(raw: RawQuestionRow): {
   const order = resolveOrder(raw.order, raw.fallbackOrder);
 
   if (raw.order && order === null) {
-    issue("No", `"${raw.order}" is not an item number.`);
+    issue(
+      "No",
+      `"${raw.order}" is not an item number. Use a whole number from 1 to 100000, or leave it blank.`,
+    );
   }
 
   if (raw.explanation.length > MAX_EXPLANATION_LENGTH) {
@@ -915,13 +918,28 @@ export function resolveBoolean(value: string): boolean | null {
   return null;
 }
 
+/**
+ * A whole, positive item number - or null, which the caller reports.
+ *
+ * Strict on purpose. Stripping every non-digit used to turn "1.5" into 15 and
+ * "-3" into 3, silently filing a question under a number nobody typed. The one
+ * leniency is a trailing ".0", because Excel hands a numeric cell back as
+ * "12.0" and the encoder did type 12.
+ */
 function resolveOrder(value: string, fallback: number): number | null {
-  if (!value) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
     return fallback;
   }
 
-  const digits = value.replace(/\D/g, "");
-  const parsed = Number.parseInt(digits, 10);
+  const match = /^(\d+)(?:\.0+)?$/.exec(trimmed);
+
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(match[1], 10);
 
   return Number.isFinite(parsed) && parsed > 0 && parsed <= 100000
     ? parsed

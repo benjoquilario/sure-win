@@ -13,6 +13,7 @@ import {
   type CommunityReplyItem,
 } from "@/lib/community"
 import { THEME, withOpacity } from "@/lib/theme"
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,7 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { useKeyboardInset } from "@/hooks/use-keyboard-inset"
 import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 import { CommunityAvatar } from "@/components/community/avatar"
@@ -96,7 +96,7 @@ const CommentRow = memo(function CommentRow({
           theme={theme}
           size="md"
         />
-        <View className="flex-1 gap-1.5">
+        <View className="min-w-0 flex-1 gap-1.5">
           <Text className="text-sm font-bold text-card-foreground">
             {comment.author.name}
           </Text>
@@ -109,6 +109,9 @@ const CommentRow = memo(function CommentRow({
             </Text>
           </View>
           <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isReplying, disabled }}
+            hitSlop={6}
             className="self-start rounded-full border border-border px-3 py-1.5"
             disabled={disabled}
             onPress={() => setIsReplying((current) => !current)}
@@ -116,7 +119,7 @@ const CommentRow = memo(function CommentRow({
           >
             <View className="flex-row items-center gap-1.5">
               <CornerDownRight size={14} color={theme.mutedForeground} />
-              <Text className="text-xs font-bold uppercase tracking-[1px] text-muted-foreground">
+              <Text variant="label" className="text-xs">
                 Reply
               </Text>
             </View>
@@ -215,7 +218,7 @@ export function CommunityThreadDialog({
                   theme={theme}
                   size="lg"
                 />
-                <View className="flex-1 gap-1.5">
+                <View className="min-w-0 flex-1 gap-1.5">
                   <Text className="text-sm font-black text-card-foreground">
                     {post.author.name}
                   </Text>
@@ -224,9 +227,7 @@ export function CommunityThreadDialog({
                   </Text>
                   {post.subjectName ? (
                     <View className="self-start rounded-full border border-border px-3 py-1.5">
-                      <Text variant="eyebrow">
-                        {post.subjectName}
-                      </Text>
+                      <Text variant="eyebrow">{post.subjectName}</Text>
                     </View>
                   ) : null}
                 </View>

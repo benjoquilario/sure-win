@@ -7,10 +7,12 @@ import LoaderCircle from "lucide-react-native/icons/loader-circle"
 import { View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
-import { THEME } from "@/lib/theme"
-import { useColorScheme } from "@/hooks/use-color-scheme"
+import { cn } from "@/lib/utils"
+import { useThemePalette } from "@/hooks/use-theme"
 import { Button } from "@/components/ui/button"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { Text } from "@/components/ui/text"
+import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 
 type VerificationState = "loading" | "success" | "error"
 
@@ -21,8 +23,7 @@ export default function VerifyEmailScreen() {
     (state) => state.completeEmailVerification
   )
   const isAuthenticated = useAuth((state) => state.isAuthenticated)
-  const colorScheme = useColorScheme()
-  const theme = colorScheme === "dark" ? THEME.dark : THEME.light
+  const theme = useThemePalette()
   const [state, setState] = useState<VerificationState>("loading")
   const [message, setMessage] = useState(
     "We are confirming your Appwrite email verification now."
@@ -72,57 +73,86 @@ export default function VerifyEmailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-1 items-center justify-center gap-5 px-6">
-        <View className="items-center gap-3">
-          <View className="h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
-            {state === "loading" ? (
-              <LoaderCircle size={28} color={theme.primary} strokeWidth={2.2} />
-            ) : state === "success" ? (
-              <BadgeCheck size={28} color={theme.success} strokeWidth={2.2} />
-            ) : (
-              <CircleAlert size={28} color={theme.warning} strokeWidth={2.2} />
-            )}
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        contentContainerClassName="py-8"
+      >
+        <ContentFrame width="reading">
+          <View className="items-center gap-6">
+            <View className="items-center gap-3">
+              <View
+                className={cn(
+                  "h-16 w-16 items-center justify-center rounded-lg",
+                  state === "loading" && "bg-primary/10",
+                  state === "success" && "bg-success/10",
+                  state === "error" && "bg-accent/15"
+                )}
+              >
+                {state === "loading" ? (
+                  <LoaderCircle
+                    size={28}
+                    color={theme.primary}
+                    strokeWidth={2.2}
+                  />
+                ) : state === "success" ? (
+                  <BadgeCheck
+                    size={28}
+                    color={theme.success}
+                    strokeWidth={2.2}
+                  />
+                ) : (
+                  <CircleAlert
+                    size={28}
+                    color={theme.accentText}
+                    strokeWidth={2.2}
+                  />
+                )}
+              </View>
+
+              <Text
+                role="heading"
+                className="text-center text-2xl font-extrabold text-foreground"
+              >
+                {state === "loading"
+                  ? "Verifying email"
+                  : state === "success"
+                    ? "Email verified"
+                    : "Verification failed"}
+              </Text>
+              <Text className="text-center text-sm leading-6 text-muted-foreground">
+                {message}
+              </Text>
+            </View>
+
+            {state === "success" ? (
+              <Button
+                size="lg"
+                className="w-full"
+                onPress={() => router.replace("/(tabs)/profile")}
+              >
+                <Text>Return to profile</Text>
+              </Button>
+            ) : null}
+
+            {state === "error" ? (
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full"
+                onPress={() =>
+                  router.replace(
+                    isAuthenticated ? "/(tabs)/profile" : "/(auth)/login"
+                  )
+                }
+              >
+                <Text>
+                  {isAuthenticated ? "Back to profile" : "Go to login"}
+                </Text>
+              </Button>
+            ) : null}
           </View>
-
-          <Text className="text-center text-2xl font-black text-foreground">
-            {state === "loading"
-              ? "Verifying email"
-              : state === "success"
-                ? "Email verified"
-                : "Verification failed"}
-          </Text>
-          <Text className="text-center text-sm leading-6 text-muted-foreground">
-            {message}
-          </Text>
-        </View>
-
-        {state === "success" ? (
-          <Button
-            className="h-11 w-full rounded-md"
-            onPress={() => router.replace("/(tabs)/profile")}
-          >
-            <Text className="font-bold text-primary-foreground">
-              Return to profile
-            </Text>
-          </Button>
-        ) : null}
-
-        {state === "error" ? (
-          <Button
-            variant="outline"
-            className="h-11 w-full rounded-md"
-            onPress={() =>
-              router.replace(
-                isAuthenticated ? "/(tabs)/profile" : "/(auth)/login"
-              )
-            }
-          >
-            <Text className="font-bold">
-              {isAuthenticated ? "Back to profile" : "Go to login"}
-            </Text>
-          </Button>
-        ) : null}
-      </View>
+        </ContentFrame>
+      </ScrollView>
     </SafeAreaView>
   )
 }

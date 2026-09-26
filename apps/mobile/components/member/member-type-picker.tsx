@@ -6,8 +6,8 @@ import {
   memberTypeOrder,
   type MemberType,
 } from "@workspace/schema"
-import { withOpacity } from "@/lib/theme"
-import { useThemePalette } from "@/hooks/use-theme"
+
+import { cn } from "@/lib/utils"
 import { Text } from "@/components/ui/text"
 
 /**
@@ -36,8 +36,6 @@ type ChipProps = {
 }
 
 const Chip = memo(function Chip({ label, isSelected, onPress }: ChipProps) {
-  const theme = useThemePalette()
-
   return (
     <Pressable
       onPress={onPress}
@@ -45,20 +43,19 @@ const Chip = memo(function Chip({ label, isSelected, onPress }: ChipProps) {
       accessibilityState={{ selected: isSelected }}
       // 44pt minimum: these are small chips and a 32pt row is a miss for
       // anyone with larger fingers or a moving bus.
-      className="min-h-[44px] justify-center rounded-full border px-3.5 py-2 active:opacity-90"
-      style={{
-        borderColor: isSelected ? theme.primary : theme.border,
-        borderWidth: isSelected ? 1.5 : 1,
-        backgroundColor: isSelected
-          ? withOpacity(theme.primary, 0.1)
-          : theme.card,
-      }}
+      className={cn(
+        "min-h-11 justify-center rounded-full border px-3.5 py-2 active:opacity-90",
+        isSelected
+          ? "border-primary bg-primary/10"
+          : "border-border bg-card web:hover:bg-muted/60"
+      )}
+      style={{ borderWidth: isSelected ? 1.5 : 1 }}
     >
       <Text
-        className="text-xs font-semibold"
-        style={{
-          color: isSelected ? theme.primary : theme.mutedForeground,
-        }}
+        className={cn(
+          "text-xs font-semibold",
+          isSelected ? "text-primary" : "text-muted-foreground"
+        )}
       >
         {label}
       </Text>

@@ -4,6 +4,7 @@ import Play from "lucide-react-native/icons/play"
 import { View } from "react-native"
 
 import type { ResumeAttemptCard, ThemePalette } from "@/lib/home-types"
+import { useGridColumns } from "@/hooks/use-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { MotionPressable } from "@/components/ui/motion"
@@ -29,12 +30,16 @@ export const ResumeAnsweringSection = memo(function ResumeAnsweringSection({
   onPressItem: (item: ResumeAttemptCard) => void
   theme: ThemePalette
 }) {
+  // Side by side on a tablet or desktop; each row is short enough that a
+  // full-width card across 900pt is mostly empty space.
+  const columns = useGridColumns(360)
+
   return (
     <View className="gap-3">
       <SectionHeader title="Continue" />
 
       {isLoading ? (
-        <View className="gap-2.5">
+        <View className="gap-3">
           <Skeleton className="h-[76px] rounded-xl" />
           <Skeleton className="h-[76px] rounded-xl" />
         </View>
@@ -45,47 +50,56 @@ export const ResumeAnsweringSection = memo(function ResumeAnsweringSection({
           description={errorMessage}
         />
       ) : (
-        <View className="gap-2.5">
+        // Each cell pads itself by half the gap and the row pulls back by the
+        // same, so the outer cards stay flush with the section edges.
+        <View className="-m-1.5 flex-row flex-wrap">
           {items.map((item) => (
-            <MotionPressable
+            // MotionPressable renders inside its own Animated.View, so the
+            // cell width has to live on a wrapper it cannot override.
+            <View
               key={item.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Resume ${item.title}. ${item.progressLabel}.`}
-              onPress={() => onPressItem(item)}
+              className="p-1.5"
+              style={{ width: `${100 / columns}%` }}
             >
-              <Card>
-                <CardContent
-                  size="compact"
-                  className="flex-row items-center gap-3"
-                >
-                  <View className="h-11 w-11 items-center justify-center rounded-lg bg-primary">
-                    <Play
-                      size={15}
-                      color={theme.primaryForeground}
-                      fill={theme.primaryForeground}
-                    />
-                  </View>
+              <MotionPressable
+                accessibilityRole="button"
+                accessibilityLabel={`Resume ${item.title}. ${item.progressLabel}.`}
+                onPress={() => onPressItem(item)}
+              >
+                <Card>
+                  <CardContent
+                    size="compact"
+                    className="flex-row items-center gap-3"
+                  >
+                    <View className="h-11 w-11 items-center justify-center rounded-lg bg-primary">
+                      <Play
+                        size={15}
+                        color={theme.primaryForeground}
+                        fill={theme.primaryForeground}
+                      />
+                    </View>
 
-                  <View className="flex-1 gap-1">
-                    <Text variant="subheading" numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    <Text variant="caption" numberOfLines={1}>
-                      {item.subtitle}
-                    </Text>
-                    <Text
-                      variant="label"
-                      className="text-primary"
-                      numberOfLines={1}
-                    >
-                      {item.progressLabel} · {item.updatedLabel}
-                    </Text>
-                  </View>
+                    <View className="min-w-0 flex-1 gap-1">
+                      <Text variant="subheading" numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <Text variant="caption" numberOfLines={1}>
+                        {item.subtitle}
+                      </Text>
+                      <Text
+                        variant="label"
+                        className="text-primary"
+                        numberOfLines={1}
+                      >
+                        {item.progressLabel} · {item.updatedLabel}
+                      </Text>
+                    </View>
 
-                  <ChevronRight size={18} color={theme.mutedForeground} />
-                </CardContent>
-              </Card>
-            </MotionPressable>
+                    <ChevronRight size={18} color={theme.mutedForeground} />
+                  </CardContent>
+                </Card>
+              </MotionPressable>
+            </View>
           ))}
         </View>
       )}

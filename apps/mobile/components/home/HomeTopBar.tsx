@@ -63,7 +63,7 @@ export const HomeTopBar = memo(function HomeTopBar({
 }: HomeTopBarProps) {
   return (
     <View className="flex-row items-center justify-between">
-      <View className="flex-row items-center gap-1">
+      <View className="min-w-0 shrink flex-row items-center gap-1">
         <IconButton label="Open menu" variant="ghost" onPress={onPressMenu}>
           {/*
             22, not 24. Menu is the densest glyph in this row — three solid
@@ -101,9 +101,7 @@ export const HomeTopBar = memo(function HomeTopBar({
 
         <View>
           <IconButton
-            label={
-              hasUnread ? "Updates, new items available" : "Updates"
-            }
+            label={hasUnread ? "Updates, new items available" : "Updates"}
             variant="ghost"
             onPress={onPressNotifications}
           >

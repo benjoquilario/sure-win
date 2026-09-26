@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native"
 
 import { withOpacity, type ThemePalette } from "@/lib/theme"
 import { getToneColor, type Tone } from "@/lib/tone"
+import { cn } from "@/lib/utils"
 import { Text } from "@/components/ui/text"
 
 import { AchievementBadgeIcon } from "./profile-achievements"
@@ -17,6 +18,8 @@ type AchievementBadgeCardProps = {
   caption: string
   tone: Tone
   onPress?: () => void
+  /** Fill a grid cell instead of the fixed 124pt rail width. */
+  fill?: boolean
 }
 
 /**
@@ -34,11 +37,17 @@ export const AchievementBadgeCard = memo(function AchievementBadgeCard({
   caption,
   tone,
   onPress,
+  fill = false,
 }: AchievementBadgeCardProps) {
   const toneColor = getToneColor(theme, tone)
 
   const body = (
-    <View className="w-[124px] items-center gap-2 rounded-xl border border-border/80 bg-card p-3.5">
+    <View
+      className={cn(
+        "items-center gap-2 rounded-xl border border-border/80 bg-card p-3.5",
+        fill ? "w-full" : "w-[124px]"
+      )}
+    >
       <View
         className="h-14 w-14 items-center justify-center rounded-2xl"
         style={{ backgroundColor: toneColor }}
@@ -66,7 +75,7 @@ export const AchievementBadgeCard = memo(function AchievementBadgeCard({
       <Text
         variant="caption"
         numberOfLines={2}
-        className="text-center text-[10px] leading-[13px]"
+        className="text-center text-2xs"
       >
         {caption}
       </Text>

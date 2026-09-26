@@ -1,3 +1,5 @@
+import type { StudySessionDocument } from "@workspace/schema"
+
 import { ID, Query } from "../appwrite"
 import {
   createRow,
@@ -7,7 +9,12 @@ import {
   listPage,
   updateRow,
 } from "../db"
-import type { StudySessionDocument } from "@workspace/schema"
+import {
+  DIFFICULTY_FILTER_LABELS,
+  QUESTION_SOURCE_LABELS,
+  type DifficultyFilter,
+  type QuestionSource,
+} from "../member/settings"
 
 /**
  * ─── One sitting ──────────────────────────────────────────────────────────
@@ -24,6 +31,56 @@ import type { StudySessionDocument } from "@workspace/schema"
  * into two rows. We use the session ID as the row ID as well, which makes every
  * later update a direct write with no lookup.
  */
+
+/**
+ * What a sitting was opened with, so a resume rebuilds the same run.
+ *
+ * Without it, "Continue" rebuilt the pool from whatever the settings said
+ * today: an 80-item, 45-minute mock resumed as 20 items with no timer. Every
+ * field is optional because rows written before these columns existed have
+ * none of them, and those simply resume the old way.
+ */
+export type SessionPlan = {
+  questionLimit: number | null
+  timeLimitSeconds: number | null
+  questionSource: QuestionSource | null
+  difficultyFilter: DifficultyFilter | null
+  shuffleQuestions: boolean | null
+  shuffleChoices: boolean | null
+}
+
+function isQuestionSource(value: unknown): value is QuestionSource {
+  return typeof value === "string" && value in QUESTION_SOURCE_LABELS
+}
+
+function isDifficultyFilter(value: unknown): value is DifficultyFilter {
+  return typeof value === "string" && value in DIFFICULTY_FILTER_LABELS
+}
+
+function toSessionPlan(row: StudySessionDocument): SessionPlan | null {
+  const plan: SessionPlan = {
+    questionLimit:
+      typeof row.questionLimit === "number" && row.questionLimit > 0
+        ? row.questionLimit
+        : null,
+    timeLimitSeconds:
+      typeof row.timeLimitSeconds === "number" && row.timeLimitSeconds > 0
+        ? row.timeLimitSeconds
+        : null,
+    questionSource: isQuestionSource(row.questionSource)
+      ? row.questionSource
+      : null,
+    difficultyFilter: isDifficultyFilter(row.difficultyFilter)
+      ? row.difficultyFilter
+      : null,
+    shuffleQuestions:
+      typeof row.shuffleQuestions === "boolean" ? row.shuffleQuestions : null,
+    shuffleChoices:
+      typeof row.shuffleChoices === "boolean" ? row.shuffleChoices : null,
+  }
+
+  return Object.values(plan).some((value) => value !== null) ? plan : null
+}
 
 export type StudyMode = NonNullable<StudySessionDocument["mode"]>
 export type StudyStatus = StudySessionDocument["status"]
@@ -47,6 +104,8 @@ export type StudySession = {
   scorePercent: number
   /** The stored `order` of the last item seen — not an array position. */
   lastQuestionOrder: number
+  /** null for sittings opened before the plan was recorded. */
+  plan: SessionPlan | null
 }
 
 export function toStudySession(row: StudySessionDocument): StudySession {
@@ -66,6 +125,7 @@ export function toStudySession(row: StudySessionDocument): StudySession {
     correctCount: row.correctCount ?? 0,
     scorePercent: row.scorePercent ?? 0,
     lastQuestionOrder: row.lastQuestionOrder ?? 0,
+    plan: toSessionPlan(row),
   }
 }
 
@@ -78,6 +138,7 @@ export type StartSessionInput = {
   label: string
   mode: StudyMode
   questionCount: number
+  plan?: SessionPlan
 }
 
 /**
@@ -107,6 +168,16 @@ export async function startStudySession(
       correctCount: 0,
       scorePercent: 0,
       lastQuestionOrder: 0,
+      ...(input.plan
+        ? {
+            questionLimit: input.plan.questionLimit ?? 0,
+            timeLimitSeconds: input.plan.timeLimitSeconds ?? 0,
+            questionSource: input.plan.questionSource ?? undefined,
+            difficultyFilter: input.plan.difficultyFilter ?? undefined,
+            shuffleQuestions: input.plan.shuffleQuestions ?? undefined,
+            shuffleChoices: input.plan.shuffleChoices ?? undefined,
+          }
+        : {}),
     },
     { rowId: sessionId, ownerId: input.userId }
   )
@@ -212,7 +283,9 @@ export async function findResumableSession(params: {
   const row = await findFirst("study_sessions", [
     Query.equal("userId", params.userId),
     Query.equal("status", "in_progress"),
-    ...(params.categoryId ? [Query.equal("categoryId", params.categoryId)] : []),
+    ...(params.categoryId
+      ? [Query.equal("categoryId", params.categoryId)]
+      : []),
     ...(params.questionnaireId !== undefined
       ? [Query.equal("questionnaireId", params.questionnaireId)]
       : []),

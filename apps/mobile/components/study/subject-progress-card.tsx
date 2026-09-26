@@ -1,13 +1,11 @@
 import { memo } from "react"
-import Lock from "lucide-react-native/icons/lock"
 import type { LucideIcon } from "lucide-react-native"
+import Lock from "lucide-react-native/icons/lock"
 import { Pressable, View } from "react-native"
 
-import type { ThemePalette } from "@/lib/theme"
-import { withOpacity } from "@/lib/theme"
+import { withOpacity, type ThemePalette } from "@/lib/theme"
 import { ProgressBar } from "@/components/ui/progress-bar"
 import { Text } from "@/components/ui/text"
-
 
 type SubjectProgressCardProps = {
   theme: ThemePalette
@@ -55,7 +53,7 @@ export const SubjectProgressCard = memo(function SubjectProgressCard({
           : `${title}, ${safePercent} percent complete, ${completed} of ${total} ${unitLabel.toLowerCase()}`
       }
       onPress={onPress}
-      className="w-[148px] gap-2.5 rounded-xl border border-border/80 bg-card p-3.5 active:opacity-85"
+      className="w-[148px] gap-2.5 rounded-xl border border-border/80 bg-card p-3.5 active:opacity-85 web:hover:bg-muted/60"
     >
       <View className="flex-row items-start justify-between">
         <View
@@ -87,12 +85,12 @@ export const SubjectProgressCard = memo(function SubjectProgressCard({
           // the card tedious to hear.
           label={undefined}
         />
-        <Text className="text-[10px] font-bold text-muted-foreground">
+        <Text className="text-2xs font-bold text-muted-foreground">
           {safePercent}%
         </Text>
       </View>
 
-      <Text variant="caption" className="text-[10px]">
+      <Text variant="caption" className="text-2xs">
         {completed} / {total} {unitLabel}
       </Text>
     </Pressable>

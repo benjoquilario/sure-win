@@ -21,9 +21,12 @@ import {
   type LearningTopicSummary,
 } from "@/lib/learning-content"
 import { listRecentLearningHistory } from "@/lib/progress"
+import { useContentPadding } from "@/hooks/use-layout"
+import { useIsPremium } from "@/hooks/use-membership"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
 import { MotionPressable } from "@/components/ui/motion"
@@ -31,7 +34,6 @@ import { SectionHeader } from "@/components/ui/section-header"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
 import { TopicCard } from "@/components/learn"
-import { useIsPremium } from "@/hooks/use-membership"
 
 const TopicSeparator = () => <View className="h-2.5" />
 
@@ -46,6 +48,7 @@ export default function ReviewCategoryScreen() {
   const isPremiumUser = useIsPremium()
 
   const [query, setQuery] = useState("")
+  const contentPadding = useContentPadding()
   const deferredQuery = useDeferredValue(query)
 
   useEffect(() => {
@@ -151,12 +154,14 @@ export default function ReviewCategoryScreen() {
     return (
       <SafeAreaView
         edges={["left", "right", "bottom"]}
-        className="flex-1 gap-3 bg-background px-4 pt-3"
+        className="flex-1 bg-background pt-3"
       >
-        <Skeleton className="h-12 rounded-md" />
-        <Skeleton className="h-24 rounded-xl" />
-        <Skeleton className="h-20 rounded-xl" />
-        <Skeleton className="h-20 rounded-xl" />
+        <ContentFrame className="gap-3">
+          <Skeleton className="h-12 rounded-md" />
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -165,19 +170,21 @@ export default function ReviewCategoryScreen() {
     return (
       <SafeAreaView
         edges={["left", "right", "bottom"]}
-        className="flex-1 justify-center bg-background px-4"
+        className="flex-1 justify-center bg-background"
       >
-        <EmptyState
-          tone="destructive"
-          title={
-            subjectQuery.error ? "Subject unavailable" : "Subject not found"
-          }
-          description={
-            subjectQuery.error instanceof Error
-              ? subjectQuery.error.message
-              : "This subject could not be loaded. It may have been removed."
-          }
-        />
+        <ContentFrame>
+          <EmptyState
+            tone="destructive"
+            title={
+              subjectQuery.error ? "Subject unavailable" : "Subject not found"
+            }
+            description={
+              subjectQuery.error instanceof Error
+                ? subjectQuery.error.message
+                : "This subject could not be loaded. It may have been removed."
+            }
+          />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -189,7 +196,7 @@ export default function ReviewCategoryScreen() {
     >
       <Stack.Screen options={{ title: category.name }} />
 
-      <View className="px-4 pb-3 pt-3">
+      <ContentFrame className="pb-3 pt-3">
         <Input
           value={query}
           onChangeText={setQuery}
@@ -198,7 +205,7 @@ export default function ReviewCategoryScreen() {
           returnKeyType="search"
           leading={<Search size={16} color={theme.mutedForeground} />}
         />
-      </View>
+      </ContentFrame>
 
       <FlashList
         data={visibleTopics}
@@ -297,7 +304,7 @@ export default function ReviewCategoryScreen() {
             />
           )
         }
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ ...contentPadding, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>

@@ -288,10 +288,13 @@ function addGuideSheet(workbook: ExcelJS.Workbook, meta: WorkbookMeta) {
     "Fill in the Questions sheet: one row per question. Do not rename or reorder the header row.",
   ]);
   guide.addRow([
-    "Item numbers (No) identify a question when you upload the file again: same number means update, new number means add.",
+    "The SKU column is what identifies a question when you upload the file again: a row that keeps its SKU updates the question it came from, and a row with an empty SKU is added as a new question.",
   ]);
   guide.addRow([
-    "You never type a SKU. The system assigns one on the first upload and keeps it on every later one, so answer history is never lost.",
+    "You never type a SKU. Leave it empty on new rows; the system assigns one on upload. On a downloaded sheet, keep each SKU exactly as it is, so answer history is never lost.",
+  ]);
+  guide.addRow([
+    "The item number (No) is only the reading order. Changing it on a row that has a SKU does not move or replace anything, and a blank No on a new row puts it at the end.",
   ]);
   guide.addRow([]);
 

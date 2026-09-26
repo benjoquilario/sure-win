@@ -72,6 +72,19 @@ function createDatabaseAdapter(client) {
   )
 }
 
+function hasActivePremium(profile, now = new Date()) {
+  if (!profile || profile.isPremium !== true) {
+    return false
+  }
+
+  if (!profile.premiumUntil) {
+    return true
+  }
+
+  const until = new Date(profile.premiumUntil).getTime()
+  return Number.isFinite(until) && until > now.getTime()
+}
+
 function withDebug(payload, debug) {
   if (!PREMIUM_ACCESS_DEBUG_MODE) {
     return payload
@@ -246,7 +259,10 @@ const handler = async ({ req, res, log, error }) => {
     })
 
     const profile = profileResult.rows[0] || null
-    const isPremiumUser = profile?.isPremium === true
+    // Flag *and* date, the same rule as `hasActivePremium` in
+    // @workspace/schema. The flag alone kept a lapsed member premium until the
+    // nightly sweep caught up.
+    const isPremiumUser = hasActivePremium(profile)
 
     const material = await database.getRow({
       databaseId: DATABASE_ID,

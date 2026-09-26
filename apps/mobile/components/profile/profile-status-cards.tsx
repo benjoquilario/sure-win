@@ -84,7 +84,7 @@ export const ProfileVerifyEmailCard = memo(function ProfileVerifyEmailCard({
       <CardContent size="compact" className="flex-row items-center gap-3">
         <MailWarning size={20} color={getToneColor(theme, "warning")} />
 
-        <View className="flex-1 gap-0.5">
+        <View className="min-w-0 flex-1 gap-0.5">
           <Text variant="subheading">Verify your email</Text>
           <Text variant="caption" numberOfLines={1}>
             {email || "Confirm your address to secure the account."}

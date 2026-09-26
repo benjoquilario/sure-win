@@ -15,9 +15,12 @@ import {
 } from "react-native"
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { cn } from "@/lib/utils"
+import { useContentPadding, useLayout } from "@/hooks/use-layout"
 import { useTheme } from "@/hooks/use-theme"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { IconButton } from "@/components/ui/icon-button"
 import { FormField, Input } from "@/components/ui/input"
 import { Text } from "@/components/ui/text"
@@ -28,6 +31,11 @@ export default function RegisterScreen() {
   const register = useAuth((state) => state.register)
   const insets = useSafeAreaInsets()
   const { theme } = useTheme()
+  const { isCompact, isSmallPhone } = useLayout()
+  const { paddingHorizontal } = useContentPadding("reading")
+  // Past phone width the form becomes a raised panel in a centred column,
+  // rather than fields stretched across a tablet or a browser window.
+  const Panel = isCompact ? View : Card
 
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -74,8 +82,12 @@ export default function RegisterScreen() {
         <ScrollView
           automaticallyAdjustKeyboardInsets
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerClassName="px-6 gap-6"
           contentContainerStyle={{
+            // Auth keeps its roomier 24pt phone margin (12pt under 360pt).
+            paddingHorizontal: Math.max(
+              paddingHorizontal,
+              isSmallPhone ? 0 : 24
+            ),
             flexGrow: 1,
             justifyContent: "center",
             paddingTop: 24,
@@ -84,114 +96,132 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         >
-          {/* Brand + heading */}
-          <View className="gap-5">
-            {/* The full signature: this is the one screen where the brand is
+          <Panel className={cn("gap-6", !isCompact && "px-8 py-10")}>
+            {/* Brand + heading */}
+            <View className="gap-5">
+              {/* The full signature: this is the one screen where the brand is
                 the point, so it gets the mark and the wordmark together. */}
-            <BrandLogo size="lg" variant="lockup" className="self-start" />
-            <View className="gap-1.5">
-              <Text className="text-3xl font-black leading-10 text-foreground">
-                Create your account
-              </Text>
-              <Text className="text-sm leading-6 text-muted-foreground">
-                Set up your review path, practice with board-exam drills, and
-                track your progress as you go.
-              </Text>
-            </View>
-          </View>
-
-          {/* Form */}
-          <View className="gap-3">
-            {error ? (
-              <View className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3">
-                <Text className="text-sm text-destructive">{error}</Text>
+              <BrandLogo size="lg" variant="lockup" className="self-start" />
+              <View className="gap-1.5">
+                <Text
+                  role="heading"
+                  className={cn(
+                    "font-extrabold text-foreground",
+                    isSmallPhone ? "text-2xl" : "text-3xl"
+                  )}
+                >
+                  Create your account
+                </Text>
+                <Text className="text-sm leading-6 text-muted-foreground">
+                  Set up your review path, practice with board-exam drills, and
+                  track your progress as you go.
+                </Text>
               </View>
-            ) : null}
+            </View>
 
-            {/* Full name field */}
-            <FormField label="Full Name">
-              <Input
-                leading={<User size={16} color={theme.mutedForeground} />}
-                placeholder="Maria Santos"
-                value={fullName}
-                onChangeText={setFullName}
-                returnKeyType="next"
-              />
-            </FormField>
+            {/* Form */}
+            <View className="gap-3">
+              {error ? (
+                <View
+                  role="alert"
+                  className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3"
+                >
+                  <Text className="text-sm text-destructive">{error}</Text>
+                </View>
+              ) : null}
 
-            {/* Email field */}
-            <FormField label="Email">
-              <Input
-                leading={<Mail size={16} color={theme.mutedForeground} />}
-                placeholder="your@email.com"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                returnKeyType="next"
-              />
-            </FormField>
+              {/* Full name field */}
+              <FormField label="Full Name">
+                <Input
+                  leading={<User size={16} color={theme.mutedForeground} />}
+                  placeholder="Maria Santos"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  returnKeyType="next"
+                />
+              </FormField>
 
-            {/* Password field */}
-            <FormField label="Password">
-              <Input
-                leading={<Lock size={16} color={theme.mutedForeground} />}
-                trailing={
-                  <IconButton
-                    label={showPassword ? "Hide password" : "Show password"}
-                    size="sm"
-                    className="-mr-2 h-9 w-9"
-                    onPress={() => setShowPassword((prev) => !prev)}
-                  >
-                    {showPassword ? (
-                      <EyeOff size={16} color={theme.mutedForeground} />
-                    ) : (
-                      <Eye size={16} color={theme.mutedForeground} />
-                    )}
-                  </IconButton>
-                }
-                placeholder="At least 8 characters"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                returnKeyType="done"
-                onSubmitEditing={handleRegister}
-              />
-            </FormField>
+              {/* Email field */}
+              <FormField label="Email">
+                <Input
+                  leading={<Mail size={16} color={theme.mutedForeground} />}
+                  placeholder="your@email.com"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  returnKeyType="next"
+                />
+              </FormField>
 
-            {/* Create account button */}
-            <Button
-              size="lg"
-              className="mt-1"
-              onPress={handleRegister}
-              disabled={isLoading}
+              {/* Password field */}
+              <FormField label="Password">
+                <Input
+                  leading={<Lock size={16} color={theme.mutedForeground} />}
+                  trailing={
+                    <IconButton
+                      label={showPassword ? "Hide password" : "Show password"}
+                      size="sm"
+                      className="-mr-2 h-9 w-9"
+                      onPress={() => setShowPassword((prev) => !prev)}
+                    >
+                      {showPassword ? (
+                        <EyeOff size={16} color={theme.mutedForeground} />
+                      ) : (
+                        <Eye size={16} color={theme.mutedForeground} />
+                      )}
+                    </IconButton>
+                  }
+                  placeholder="At least 8 characters"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  returnKeyType="done"
+                  onSubmitEditing={handleRegister}
+                />
+              </FormField>
+
+              {/* Create account button */}
+              <Button
+                size="lg"
+                className="mt-1"
+                onPress={handleRegister}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={theme.primaryForeground} />
+                ) : (
+                  <Text>Start Exploring</Text>
+                )}
+              </Button>
+            </View>
+
+            {/* Login link */}
+            <View className="flex-row flex-wrap items-center justify-center gap-x-1">
+              <Text className="text-sm text-muted-foreground">
+                Already have an account?
+              </Text>
+              <Pressable
+                role="link"
+                hitSlop={8}
+                className="min-h-11 justify-center web:hover:opacity-80"
+                onPress={() => router.push("/(auth)/login")}
+              >
+                <Text className="text-sm font-bold text-primary">Sign in</Text>
+              </Pressable>
+            </View>
+
+            <Pressable
+              role="link"
+              hitSlop={8}
+              onPress={() => router.push("/diagnostics")}
+              className="min-h-11 items-center justify-center self-center px-2 web:hover:opacity-80"
             >
-              {isLoading ? (
-                <ActivityIndicator color={theme.primaryForeground} />
-              ) : (
-                <Text>Start Exploring</Text>
-              )}
-            </Button>
-          </View>
-
-          {/* Login link */}
-          <View className="flex-row items-center justify-center gap-1">
-            <Text className="text-sm text-muted-foreground">
-              Already have an account?
-            </Text>
-            <Pressable onPress={() => router.push("/(auth)/login")}>
-              <Text className="text-sm font-bold text-primary">Sign in</Text>
+              <Text className="text-sm font-bold text-primary">
+                Open diagnostics
+              </Text>
             </Pressable>
-          </View>
-
-          <Pressable
-            onPress={() => router.push("/diagnostics")}
-            className="items-center"
-          >
-            <Text className="text-sm font-bold text-primary">
-              Open diagnostics
-            </Text>
-          </Pressable>
+          </Panel>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

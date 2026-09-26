@@ -2,14 +2,19 @@ import { memo } from "react"
 import { Pressable, View } from "react-native"
 
 import type { QuestionsAnsweredTimeline } from "@/lib/performance-stats"
-import { THEME, withOpacity } from "@/lib/theme"
+import { withOpacity, type ThemePalette } from "@/lib/theme"
+import { useLayout } from "@/hooks/use-layout"
 import { Text } from "@/components/ui/text"
 
-type ThemePalette = (typeof THEME)["light"] | (typeof THEME)["dark"]
-
 const BAR_MAX_HEIGHT = 110
+/** Room on the right for the y-axis labels. */
+const Y_AXIS_WIDTH = 36
 
-const BarChartGridlines = memo(function BarChartGridlines({ theme }: { theme: ThemePalette }) {
+const BarChartGridlines = memo(function BarChartGridlines({
+  theme,
+}: {
+  theme: ThemePalette
+}) {
   return (
     <>
       {[0, 0.5, 1].map((ratio) => (
@@ -18,7 +23,7 @@ const BarChartGridlines = memo(function BarChartGridlines({ theme }: { theme: Th
           style={{
             position: "absolute",
             left: 0,
-            right: 30,
+            right: Y_AXIS_WIDTH - 6,
             top: (1 - ratio) * BAR_MAX_HEIGHT,
             height: 1,
             backgroundColor: withOpacity(theme.border, 0.5),
@@ -29,39 +34,42 @@ const BarChartGridlines = memo(function BarChartGridlines({ theme }: { theme: Th
   )
 })
 
-const BarChartYAxis = memo(function BarChartYAxis({ theme, maxValue }: { theme: ThemePalette, maxValue: number }) {
+const BarChartYAxis = memo(function BarChartYAxis({
+  maxValue,
+}: {
+  maxValue: number
+}) {
   return (
     <View
-      style={{
-        position: "absolute",
-        right: 0,
-        top: 0,
-        alignItems: "flex-end",
-        height: BAR_MAX_HEIGHT,
-        justifyContent: "space-between",
-      }}
+      className="absolute right-0 top-0 items-end justify-between"
+      style={{ height: BAR_MAX_HEIGHT }}
     >
-      <Text style={{ fontSize: 10, color: theme.mutedForeground, fontWeight: "600" }}>
-        {maxValue}
-      </Text>
-      <Text style={{ fontSize: 10, color: theme.mutedForeground, fontWeight: "600" }}>
-        {Math.round(maxValue / 2)}
-      </Text>
-      <Text style={{ fontSize: 10, color: theme.mutedForeground, fontWeight: "600" }}>
-        0
-      </Text>
+      {[maxValue, Math.round(maxValue / 2), 0].map((value, index) => (
+        <Text
+          key={`y-${index}`}
+          className="text-2xs font-semibold text-muted-foreground"
+        >
+          {value}
+        </Text>
+      ))}
     </View>
   )
 })
 
 const BarChartBars = memo(function BarChartBars({
-  points, theme, maxValue, selectedBarIndex, onSelectBar
+  points,
+  theme,
+  maxValue,
+  selectedBarIndex,
+  onSelectBar,
+  gap,
 }: {
   points: QuestionsAnsweredTimeline["points"]
   theme: ThemePalette
   maxValue: number
   selectedBarIndex: number | null
   onSelectBar: (index: number) => void
+  gap: number
 }) {
   return (
     <View
@@ -69,33 +77,33 @@ const BarChartBars = memo(function BarChartBars({
         flex: 1,
         flexDirection: "row",
         alignItems: "flex-end",
-        gap: 8,
-        paddingRight: 36,
+        gap,
+        paddingRight: Y_AXIS_WIDTH,
         height: BAR_MAX_HEIGHT,
       }}
     >
       {points.map((point, index) => {
-        const height = point.value === 0 ? 4 : Math.max((point.value / maxValue) * BAR_MAX_HEIGHT, 8)
+        const height =
+          point.value === 0
+            ? 4
+            : Math.max((point.value / maxValue) * BAR_MAX_HEIGHT, 8)
         const isSelected = selectedBarIndex === index
 
         return (
           <Pressable
             key={point.key}
+            role="button"
+            accessibilityLabel={`${point.label}: ${point.value} answered`}
+            accessibilityState={{ selected: isSelected }}
             onPress={() => onSelectBar(index)}
-            style={{ flex: 1, alignItems: "center" }}
+            className="flex-1 items-center"
           >
             {isSelected && point.value > 0 ? (
-              <View
-                style={{
-                  backgroundColor: theme.primary,
-                  borderRadius: 10,
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  marginBottom: 6,
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ fontSize: 10, fontWeight: "800", color: theme.primaryForeground }} numberOfLines={1}>
+              <View className="mb-1.5 items-center rounded-xs bg-primary px-2 py-1">
+                <Text
+                  className="text-2xs font-extrabold text-primary-foreground"
+                  numberOfLines={1}
+                >
                   {point.value}
                 </Text>
                 <View
@@ -116,15 +124,16 @@ const BarChartBars = memo(function BarChartBars({
             ) : null}
 
             <View
+              className="rounded-xs"
               style={{
                 width: "85%",
                 height,
-                borderRadius: 6,
-                backgroundColor: point.value === 0
-                  ? withOpacity(theme.primary, 0.06)
-                  : isSelected
-                    ? theme.primary
-                    : withOpacity(theme.primary, 0.3),
+                backgroundColor:
+                  point.value === 0
+                    ? withOpacity(theme.primary, 0.06)
+                    : isSelected
+                      ? theme.primary
+                      : withOpacity(theme.primary, 0.3),
               }}
             />
           </Pressable>
@@ -135,16 +144,23 @@ const BarChartBars = memo(function BarChartBars({
 })
 
 const BarChartLabels = memo(function BarChartLabels({
-  points, theme
+  points,
+  gap,
 }: {
   points: QuestionsAnsweredTimeline["points"]
-  theme: ThemePalette
+  gap: number
 }) {
   return (
-    <View className="flex-row" style={{ paddingRight: 36, marginTop: 8, gap: 8 }}>
+    <View className="mt-2 flex-row" style={{ paddingRight: Y_AXIS_WIDTH, gap }}>
       {points.map((point) => (
-        <View key={`label-${point.key}`} style={{ flex: 1 }}>
-          <Text style={{ fontSize: 10, fontWeight: "600", color: theme.mutedForeground, textAlign: "center" }}>
+        <View key={`label-${point.key}`} className="flex-1">
+          <Text
+            className="text-center text-2xs font-semibold text-muted-foreground"
+            numberOfLines={1}
+            // Twelve month labels share ~230pt on a 320pt phone.
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
             {point.label}
           </Text>
         </View>
@@ -164,22 +180,24 @@ export const BarChart = memo(function BarChart({
   selectedBarIndex: number | null
   onSelectBar: (index: number) => void
 }) {
+  const { isSmallPhone } = useLayout()
   const maxValue = Math.max(1, ...timeline.points.map((p) => p.value))
+  // A dense year view needs the space more than the bars need the gap.
+  const gap = isSmallPhone || timeline.points.length > 8 ? 4 : 8
 
   return (
-    <View className="gap-2">
-      <View style={{ height: BAR_MAX_HEIGHT + 28, position: "relative" }}>
-        <BarChartGridlines theme={theme} />
-        <BarChartYAxis theme={theme} maxValue={maxValue} />
-        <BarChartBars 
-          points={timeline.points} 
-          theme={theme} 
-          maxValue={maxValue} 
-          selectedBarIndex={selectedBarIndex} 
-          onSelectBar={onSelectBar} 
-        />
-        <BarChartLabels points={timeline.points} theme={theme} />
-      </View>
+    <View style={{ height: BAR_MAX_HEIGHT + 28, position: "relative" }}>
+      <BarChartGridlines theme={theme} />
+      <BarChartYAxis maxValue={maxValue} />
+      <BarChartBars
+        points={timeline.points}
+        theme={theme}
+        maxValue={maxValue}
+        selectedBarIndex={selectedBarIndex}
+        onSelectBar={onSelectBar}
+        gap={gap}
+      />
+      <BarChartLabels points={timeline.points} gap={gap} />
     </View>
   )
 })

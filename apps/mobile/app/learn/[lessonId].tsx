@@ -16,6 +16,7 @@ import {
   listLearningMaterialsByTopicId,
 } from "@/lib/learning-content"
 import { normalizeMaterialContentToMarkdown } from "@/lib/learning-material-content"
+import { toAchievementSnapshot } from "@/lib/member/profile"
 import {
   getLearningMaterialStatus,
   trackLearningMaterialCompleted,
@@ -24,10 +25,13 @@ import {
   trackLearningMaterialSession,
   type LearningMaterialStatusSnapshot,
 } from "@/lib/progress"
+import { useContentPadding, useLayout } from "@/hooks/use-layout"
+import { useIsPremium } from "@/hooks/use-membership"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { ContentFrame } from "@/components/ui/content-frame"
 import {
   Dialog,
   DialogContent,
@@ -49,8 +53,6 @@ import {
   MaterialTypeIcon,
 } from "@/components/learn"
 import { ScreenHeader } from "@/components/screen-header"
-import { toAchievementSnapshot } from "@/lib/member/profile"
-import { useIsPremium } from "@/hooks/use-membership"
 
 const SHORT_DATETIME_FMT = new Intl.DateTimeFormat("en-PH", {
   dateStyle: "medium",
@@ -107,6 +109,8 @@ export default function LessonDetailScreen() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const theme = useThemePalette()
+  const { isSmallPhone } = useLayout()
+  const contentPadding = useContentPadding("reading")
   const user = useAuth((state) => state.user)
   const isAuthenticated = useAuth((state) => state.isAuthenticated)
   const profile = useAuth((state) => state.profile)
@@ -353,11 +357,13 @@ export default function LessonDetailScreen() {
 
   if (materialQuery.isLoading) {
     return (
-      <SafeAreaView className="flex-1 gap-4 bg-background px-4 pt-3">
-        <Skeleton className="h-11 w-11 rounded-lg" />
-        <Skeleton className="h-8 w-3/4 rounded-xs" />
-        <Skeleton className="h-6 w-32 rounded-full" />
-        <Skeleton className="h-56 rounded-xl" />
+      <SafeAreaView className="flex-1 bg-background">
+        <ContentFrame width="reading" className="gap-4 pt-3">
+          <Skeleton className="h-11 w-11 rounded-lg" />
+          <Skeleton className="h-8 w-3/4 rounded-xs" />
+          <Skeleton className="h-6 w-32 rounded-full" />
+          <Skeleton className="h-56 rounded-xl" />
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -365,7 +371,7 @@ export default function LessonDetailScreen() {
   if (materialQuery.error || !materialDetail) {
     return (
       <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 justify-center px-4">
+        <ContentFrame width="reading" className="flex-1 justify-center">
           <EmptyState
             tone="destructive"
             title={
@@ -384,7 +390,7 @@ export default function LessonDetailScreen() {
               </Button>
             }
           />
-        </View>
+        </ContentFrame>
       </SafeAreaView>
     )
   }
@@ -392,8 +398,15 @@ export default function LessonDetailScreen() {
   if (materialDetail.material.isLocked) {
     return (
       <SafeAreaView className="flex-1 bg-background">
-        <ScrollView contentContainerClassName="gap-4 px-4 pb-10">
-          <ScreenHeader title={materialDetail.topic.title} />
+        <ScreenHeader title={materialDetail.topic.title} width="reading" />
+        <ScrollView
+          contentContainerClassName="gap-4"
+          contentContainerStyle={{
+            ...contentPadding,
+            paddingTop: 4,
+            paddingBottom: 40,
+          }}
+        >
           <EmptyState
             tone="accent"
             title="Premium content"
@@ -430,26 +443,32 @@ export default function LessonDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* The header names the topic — the lesson title belongs in the
+          document, at document size, not squeezed into a nav bar. */}
+      <ScreenHeader
+        title={materialDetail.topic.title}
+        width="reading"
+        trailing={
+          <IconButton
+            label="Material details"
+            size="sm"
+            variant="outline"
+            onPress={() => setIsDetailsOpen(true)}
+          >
+            <Info size={18} color={theme.primary} />
+          </IconButton>
+        }
+      />
+
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="gap-5 px-4 pb-10"
+        contentContainerClassName="gap-5"
+        contentContainerStyle={{
+          ...contentPadding,
+          paddingTop: 4,
+          paddingBottom: 40,
+        }}
       >
-        {/* The header names the topic — the lesson title belongs in the
-            document, at document size, not squeezed into a nav bar. */}
-        <ScreenHeader
-          title={materialDetail.topic.title}
-          trailing={
-            <IconButton
-              label="Material details"
-              size="sm"
-              variant="outline"
-              onPress={() => setIsDetailsOpen(true)}
-            >
-              <Info size={18} color={theme.primary} />
-            </IconButton>
-          }
-        />
-
         <View className="gap-2.5">
           <Text variant="eyebrow" numberOfLines={1}>
             {materialDetail.subject.name}
@@ -457,7 +476,14 @@ export default function LessonDetailScreen() {
 
           {/* Was `text-base` under a 14px all-caps breadcrumb — the title
               read smaller than its own kicker. */}
-          <Text className="text-2xl font-black leading-8">
+          <Text
+            role="heading"
+            className={
+              isSmallPhone
+                ? "text-xl font-extrabold"
+                : "text-2xl font-extrabold"
+            }
+          >
             {materialDetail.material.title}
           </Text>
 
@@ -564,7 +590,7 @@ export default function LessonDetailScreen() {
               <Card>
                 <CardContent
                   size="compact"
-                  className="flex-row items-center gap-3"
+                  className="flex-row items-center gap-3 web:hover:bg-muted/60"
                 >
                   <View className="flex-1 gap-0.5">
                     <Text variant="label">Next in this topic</Text>

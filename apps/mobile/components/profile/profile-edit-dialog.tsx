@@ -3,6 +3,7 @@ import Camera from "lucide-react-native/icons/camera"
 import { View } from "react-native"
 
 import type { MemberType } from "@workspace/schema"
+
 import type { ThemePalette } from "@/lib/theme"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,8 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { FormField, Input } from "@/components/ui/input"
-import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 import { Text } from "@/components/ui/text"
+import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 import { CommunityAvatar } from "@/components/community/avatar"
 import { MemberTypePicker } from "@/components/member/member-type-picker"
 
@@ -90,10 +91,12 @@ export const ProfileEditDialog = memo(function ProfileEditDialog({
                   size="lg"
                 />
 
-                <View className="flex-1 flex-row gap-2">
+                {/* Wraps under the avatar on a 320pt phone rather than
+                    truncating "Use initials" to "Use in…". */}
+                <View className="min-w-0 flex-1 flex-row flex-wrap gap-2">
                   <Button
                     size="sm"
-                    className="flex-1"
+                    className="grow basis-24"
                     disabled={isUploadingAvatar}
                     accessibilityLabel="Choose a profile photo"
                     onPress={onPickPhoto}
@@ -106,7 +109,7 @@ export const ProfileEditDialog = memo(function ProfileEditDialog({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1"
+                    className="grow basis-24"
                     accessibilityLabel="Use initials instead of a photo"
                     onPress={onClearAvatar}
                   >

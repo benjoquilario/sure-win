@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Image, View } from "react-native"
 
-import { THEME, withOpacity } from "@/lib/theme"
+import { getBrandSurfacePalette, THEME, withOpacity } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { Text } from "@/components/ui/text"
 
@@ -51,6 +51,7 @@ export function CommunityAvatar({
 }: CommunityAvatarProps) {
   const sizeStyle = SIZE_STYLES[size]
   const isBrand = tone === "brand"
+  const brand = getBrandSurfacePalette()
   const [imageFailed, setImageFailed] = useState(false)
   const normalizedSourceUri = useMemo(
     () => sourceUri?.trim() || null,
@@ -71,9 +72,9 @@ export function CommunityAvatar({
       )}
       style={{
         backgroundColor: isBrand
-          ? "hsl(0 0% 100% / 0.16)"
+          ? brand.overlayStrong
           : withOpacity(theme.primary, 0.12),
-        borderColor: isBrand ? "hsl(0 0% 100% / 0.24)" : theme.border,
+        borderColor: isBrand ? brand.border : theme.border,
       }}
     >
       {shouldRenderImage ? (
@@ -86,7 +87,7 @@ export function CommunityAvatar({
       ) : (
         <Text
           className={cn("font-black uppercase", sizeStyle.text)}
-          style={{ color: isBrand ? "#ffffff" : theme.primary }}
+          style={{ color: isBrand ? brand.foreground : theme.primary }}
         >
           {label}
         </Text>

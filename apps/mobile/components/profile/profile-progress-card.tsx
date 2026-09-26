@@ -8,6 +8,7 @@ import { View } from "react-native"
 import type { ThemePalette } from "@/lib/theme"
 import { Card, CardContent } from "@/components/ui/card"
 import { ProgressBar } from "@/components/ui/progress-bar"
+import { SectionHeader } from "@/components/ui/section-header"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
 import { MetricRow } from "@/components/study/metric-row"
@@ -57,19 +58,21 @@ export const ProfileProgressCard = memo(function ProfileProgressCard({
 
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between">
-        <Text variant="heading">Study Progress</Text>
-        <SectionLink
-          theme={theme}
-          label="View Details"
-          accessibilityLabel="View performance details"
-          onPress={onPressViewDetails}
-        />
-      </View>
+      <SectionHeader
+        title="Study Progress"
+        action={
+          <SectionLink
+            theme={theme}
+            label="View Details"
+            accessibilityLabel="View performance details"
+            onPress={onPressViewDetails}
+          />
+        }
+      />
 
       <Card>
         <CardContent className="gap-3.5">
-          <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center justify-between gap-3">
             <Text variant="callout" className="font-semibold">
               Overall Progress
             </Text>

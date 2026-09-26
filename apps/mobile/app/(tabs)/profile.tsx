@@ -14,41 +14,43 @@ import { useAppPreferences } from "@/lib/app-preferences"
 import { getAvatarUrl, getInitials } from "@/lib/auth"
 import { buildExamCountdown } from "@/lib/exam-countdown"
 import { prepareImageForUpload } from "@/lib/image-upload"
+import { listLearningSubjects } from "@/lib/learning-content"
+import { getMembership } from "@/lib/member/membership"
+import { getMemberTypeDisplay } from "@/lib/member/profile"
+import { getStaggerDelay } from "@/lib/motion"
 import { getOverallPerformanceStats } from "@/lib/performance-stats"
 import { getUserActivityFeed } from "@/lib/progress"
-import { listLearningSubjects } from "@/lib/learning-content"
-import { getStaggerDelay } from "@/lib/motion"
 import {
   buildRecentActivityEntries,
   buildStudyProgressSummary,
   buildSubjectProgressItems,
 } from "@/lib/study-dashboard"
+import { useContentPadding, useGridColumns } from "@/hooks/use-layout"
+import { useIsPremium, useSubscription } from "@/hooks/use-membership"
 import { useThemePalette } from "@/hooks/use-theme"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { FadeInView } from "@/components/ui/motion"
 import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
-import { RecentActivitySection } from "@/components/study/recent-activity"
-import {
-  SubjectProgressSection,
-  type SubjectRailItem,
-} from "@/components/study/subject-progress-section"
+import { AppShellHeader } from "@/components/app-shell-header"
+import { MemberIdentityRows } from "@/components/member/member-identity-row"
+import { MembershipCard } from "@/components/member/membership-card"
 import {
   AchievementsSection,
+  getAchievementBadgeMeta,
   ProfileEditDialog,
   ProfileIdentityCard,
   ProfileProgressCard,
   ProfileTopBar,
   ProfileVerifyEmailCard,
-  getAchievementBadgeMeta,
   type AchievementCardItem,
 } from "@/components/profile"
-import { getMembership } from "@/lib/member/membership"
-import { getMemberTypeDisplay } from "@/lib/member/profile"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { MemberIdentityRows } from "@/components/member/member-identity-row"
-import { MembershipCard } from "@/components/member/membership-card"
-import { useIsPremium, useSubscription } from "@/hooks/use-membership"
+import { RecentActivitySection } from "@/components/study/recent-activity"
+import {
+  SubjectProgressSection,
+  type SubjectRailItem,
+} from "@/components/study/subject-progress-section"
 
 const SUBJECT_PREVIEW_COUNT = 6
 const ACHIEVEMENT_PREVIEW_COUNT = 6
@@ -68,6 +70,13 @@ function ProfileScreenContent() {
   const uploadProfilePhoto = useAuth((state) => state.uploadProfilePhoto)
   const updateProfile = useAuth((state) => state.updateProfile)
   const sendVerificationEmail = useAuth((state) => state.sendVerificationEmail)
+
+  const contentPadding = useContentPadding()
+  // Identity on the left, membership and details stacked on the right, once
+  // each column keeps 360pt. Stacked on a tablet they are three very wide,
+  // very short panels.
+  const pairCards = useGridColumns(360) >= 2
+  const pairCellStyle = pairCards ? { flex: 1 } : undefined
 
   const examDate = useAppPreferences((state) => state.preferences.examDate)
   const [isSendingVerification, setIsSendingVerification] = useState(false)
@@ -367,9 +376,13 @@ function ProfileScreenContent() {
   // ─── Render ─────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView
+      className="flex-1 bg-background"
+      edges={["top", "left", "right"]}
+    >
       <ScrollView
-        contentContainerClassName="gap-6 px-4 pb-6 pt-1"
+        contentContainerClassName="gap-6 pt-1"
+        contentContainerStyle={{ ...contentPadding, paddingBottom: 32 }}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       >
@@ -380,18 +393,10 @@ function ProfileScreenContent() {
         />
 
         <FadeInView delay={getStaggerDelay(0)}>
-          <View className="gap-1">
-            <Text
-              role="heading"
-              aria-level="1"
-              className="text-3xl font-extrabold leading-10 text-foreground"
-            >
-              My Profile
-            </Text>
-            <Text variant="callout" className="text-muted-foreground">
-              Stay consistent. Your future self will thank you.
-            </Text>
-          </View>
+          <AppShellHeader
+            title="My Profile"
+            subtitle="Stay consistent. Your future self will thank you."
+          />
         </FadeInView>
 
         {!emailVerified ? (
@@ -403,48 +408,52 @@ function ProfileScreenContent() {
           />
         ) : null}
 
-        <FadeInView delay={getStaggerDelay(1)}>
-          <ProfileIdentityCard
-            theme={theme}
-            displayName={displayName}
-            initials={initials}
-            avatarUrl={avatarSource}
-            roleLabel={roleLabel}
-            subtitle={school || "Add your school or review centre"}
-            isSubtitlePlaceholder={!school}
-            isVerified={emailVerified}
-            daysLeftLabel={countdown ? countdown.daysLabel : "—"}
-            questionsSolved={progressSummary.questionsSolved}
-            averageScore={progressSummary.averageScore}
-            dayStreak={progressSummary.dayStreak}
-            onPressEdit={openEditDialog}
-          />
-        </FadeInView>
+        <View className={pairCards ? "flex-row items-start gap-5" : "gap-6"}>
+          <FadeInView delay={getStaggerDelay(1)} style={pairCellStyle}>
+            <ProfileIdentityCard
+              theme={theme}
+              displayName={displayName}
+              initials={initials}
+              avatarUrl={avatarSource}
+              roleLabel={roleLabel}
+              subtitle={school || "Add your school or review centre"}
+              isSubtitlePlaceholder={!school}
+              isVerified={emailVerified}
+              daysLeftLabel={countdown ? countdown.daysLabel : "—"}
+              questionsSolved={progressSummary.questionsSolved}
+              averageScore={progressSummary.averageScore}
+              dayStreak={progressSummary.dayStreak}
+              onPressEdit={openEditDialog}
+            />
+          </FadeInView>
 
-        <FadeInView delay={getStaggerDelay(2)}>
-          <MembershipCard
-            membership={membership}
-            subscriptionDetail={subscription.description?.detail}
-            onUpgrade={() => router.push("/premium")}
-          />
-        </FadeInView>
+          <View className="gap-6" style={pairCellStyle}>
+            <FadeInView delay={getStaggerDelay(2)}>
+              <MembershipCard
+                membership={membership}
+                subscriptionDetail={subscription.description?.detail}
+                onUpgrade={() => router.push("/premium")}
+              />
+            </FadeInView>
 
-        <FadeInView delay={getStaggerDelay(3)}>
-          <Card>
-            <CardContent className="gap-2">
-              <Text variant="label">About you</Text>
-              <MemberIdentityRows profile={profile} />
-              <Button
-                size="sm"
-                variant="outline"
-                className="self-start"
-                onPress={openEditDialog}
-              >
-                <Text>Edit details</Text>
-              </Button>
-            </CardContent>
-          </Card>
-        </FadeInView>
+            <FadeInView delay={getStaggerDelay(3)}>
+              <Card>
+                <CardContent className="gap-2">
+                  <Text variant="label">About you</Text>
+                  <MemberIdentityRows profile={profile} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="self-start"
+                    onPress={openEditDialog}
+                  >
+                    <Text>Edit details</Text>
+                  </Button>
+                </CardContent>
+              </Card>
+            </FadeInView>
+          </View>
+        </View>
 
         <FadeInView delay={getStaggerDelay(4)}>
           <ProfileProgressCard

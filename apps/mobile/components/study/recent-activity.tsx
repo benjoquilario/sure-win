@@ -1,6 +1,6 @@
 import { memo } from "react"
-import ChevronRight from "lucide-react-native/icons/chevron-right"
 import type { LucideIcon } from "lucide-react-native"
+import ChevronRight from "lucide-react-native/icons/chevron-right"
 import { Pressable, View } from "react-native"
 
 import { withOpacity, type ThemePalette } from "@/lib/theme"
@@ -8,6 +8,7 @@ import { getToneColor, TONE_TEXT_CLASS, type Tone } from "@/lib/tone"
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { SectionHeader } from "@/components/ui/section-header"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
 
@@ -98,7 +99,7 @@ export const RecentActivityRow = memo(function RecentActivityRow({
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${timeLabel}`}
       onPress={onPress}
-      className="active:bg-muted/50"
+      className="active:bg-muted/50 web:hover:bg-muted/60"
     >
       {content}
     </Pressable>
@@ -135,18 +136,20 @@ export const RecentActivitySection = memo(function RecentActivitySection({
 }: RecentActivitySectionProps) {
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between">
-        <Text variant="heading">{title}</Text>
-        <SectionLink
-          theme={theme}
-          label="See all"
-          accessibilityLabel="See all recent activity"
-          onPress={onPressSeeAll}
-        />
-      </View>
+      <SectionHeader
+        title={title}
+        action={
+          <SectionLink
+            theme={theme}
+            label="See all"
+            accessibilityLabel="See all recent activity"
+            onPress={onPressSeeAll}
+          />
+        }
+      />
 
       {isLoading ? (
-        <Skeleton className="h-[168px] rounded-xl" />
+        <Skeleton className="h-44 rounded-xl" />
       ) : errorMessage ? (
         <EmptyState
           tone="destructive"

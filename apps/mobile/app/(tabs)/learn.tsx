@@ -17,17 +17,24 @@ import {
   listLearningSubjects,
   type LearningSubject,
 } from "@/lib/learning-content"
+import { useGridColumns, useLayout } from "@/hooks/use-layout"
+import { useIsPremium } from "@/hooks/use-membership"
 import { useThemePalette } from "@/hooks/use-theme"
 import { Card, CardContent } from "@/components/ui/card"
+import { ContentFrame } from "@/components/ui/content-frame"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Text } from "@/components/ui/text"
 import { AppShellHeader } from "@/components/app-shell-header"
 import { SubjectCard } from "@/components/learn"
-import { useIsPremium } from "@/hooks/use-membership"
 
-const SubjectSeparator = () => <View className="h-2.5" />
+/**
+ * Half the gap between grid cells. Each cell pads itself by this much on every
+ * side and the list pulls its padding in by the same amount, so the cards line
+ * up with the pinned header while sitting a full `gap-3` apart from each other.
+ */
+const CELL_INSET = 6
 
 const SubjectSkeleton = () => (
   <Card>
@@ -57,6 +64,10 @@ export default function LearningLibraryScreen() {
 
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
+
+  const { paddingFor } = useLayout()
+  // Two columns once each card keeps 320pt, three on a wide desktop window.
+  const columns = useGridColumns(320)
 
   useEffect(() => {
     if (isAuthenticated && !profile) {
@@ -109,12 +120,14 @@ export default function LearningLibraryScreen() {
 
   const renderSubject = useCallback(
     ({ item }: ListRenderItemInfo<LearningSubject>) => (
-      <SubjectCard
-        subject={item}
-        theme={theme}
-        showPremiumMix={!isPremiumUser && item.hasPremiumContent}
-        onPress={handleSubjectPress}
-      />
+      <View style={{ padding: CELL_INSET }}>
+        <SubjectCard
+          subject={item}
+          theme={theme}
+          showPremiumMix={!isPremiumUser && item.hasPremiumContent}
+          onPress={handleSubjectPress}
+        />
+      </View>
     ),
     [handleSubjectPress, isPremiumUser, theme]
   )
@@ -127,10 +140,15 @@ export default function LearningLibraryScreen() {
         : null
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView
+      className="flex-1 bg-background"
+      edges={["top", "left", "right"]}
+    >
       {/* Search stays pinned rather than scrolling away inside the list
-          header — in a library, the filter is the primary control. */}
-      <View className="gap-3 px-4 pb-3 pt-3">
+          header — in a library, the filter is the primary control. Its
+          bottom padding is short because the first row's cell inset
+          supplies the rest of the gap. */}
+      <ContentFrame className="gap-3 pb-1.5 pt-3">
         <AppShellHeader
           compact
           eyebrow="Learn"
@@ -145,18 +163,22 @@ export default function LearningLibraryScreen() {
           returnKeyType="search"
           leading={<Search size={16} color={theme.mutedForeground} />}
         />
-      </View>
+      </ContentFrame>
 
       <FlashList
+        // FlashList cannot change `numColumns` on a mounted list; keying on
+        // the count remounts it when a rotation or window resize crosses a
+        // breakpoint.
+        key={`subjects-${columns}`}
+        numColumns={columns}
         data={subjectsQuery.isLoading || errorMessage ? [] : visibleSubjects}
         extraData={theme}
         keyExtractor={(item) => item.id}
         renderItem={renderSubject}
-        ItemSeparatorComponent={SubjectSeparator}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           subjectsQuery.isLoading ? (
-            <View className="gap-2.5">
+            <View className="gap-3" style={{ padding: CELL_INSET }}>
               <SubjectSkeleton />
               <SubjectSkeleton />
               <SubjectSkeleton />
@@ -166,31 +188,31 @@ export default function LearningLibraryScreen() {
               tone="destructive"
               title="Library unavailable"
               description={errorMessage}
+              style={{ margin: CELL_INSET }}
             />
           ) : query.trim() ? (
             <EmptyState
               title="No matching subjects"
               description={`Nothing in the library matches "${query.trim()}".`}
+              style={{ margin: CELL_INSET }}
             />
           ) : (
             <EmptyState
               title="No subjects yet"
               description="Add subject records in Appwrite to populate the library."
+              style={{ margin: CELL_INSET }}
             />
           )
         }
         ListFooterComponent={
           visibleSubjects.length > 0 ? (
-            <Text variant="label" className="pt-4 text-center">
+            <Text variant="label" className="pt-3 text-center">
               {visibleSubjects.length} of {subjects.length} subjects
             </Text>
           ) : null
         }
         contentContainerStyle={{
-          paddingHorizontal: 16,
-          // Clears the tab bar's raised Study button, which overhangs
-          // into this screen by 20px. The bar itself sits below the
-          // screen rather than over it, so its height needs no allowance.
+          paddingHorizontal: paddingFor("standard") - CELL_INSET,
           paddingBottom: 32,
         }}
         showsVerticalScrollIndicator={false}

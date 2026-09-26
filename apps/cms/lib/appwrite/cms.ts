@@ -438,6 +438,11 @@ export async function saveCmsRow(
  * pointed at a row once it is gone - and because delete is owner-only on those
  * tables, no member could clear them afterwards either. The cascade lives in
  * `community.ts`; this routes the three tables that need it.
+ *
+ * Exam categories and sets are deliberately NOT here. Their children are
+ * encoded questions with SKUs and answer history, too much to lose to one
+ * click, so `deleteCmsRecord` refuses to delete either while anything is still
+ * inside it (see `explainBlockedDelete` in `lib/actions/cms.ts`).
  */
 const CASCADING_DELETES: Partial<
   Record<ReviewerTableKey, (rowId: string) => Promise<unknown>>

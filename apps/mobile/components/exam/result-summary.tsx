@@ -14,7 +14,10 @@ import { Text } from "@/components/ui/text"
  * three tiles below are the "what now" the score alone cannot answer.
  */
 
-/** The board's own bar. Shown as a line, not a pass/fail verdict. */
+/**
+ * The pass mark when neither the set nor the category sets one. Shown as a
+ * line, not a pass/fail verdict. Encoders override it per paper in the CMS.
+ */
 export const PASSING_SCORE = 75
 
 type ResultSummaryProps = {
@@ -23,6 +26,8 @@ type ResultSummaryProps = {
   answeredCount: number
   durationSeconds: number
   label: string
+  /** This paper's pass mark, already resolved from set and category. */
+  passingScore?: number
 }
 
 function formatDuration(totalSeconds: number) {
@@ -36,16 +41,18 @@ function formatDuration(totalSeconds: number) {
   return `${minutes}m ${String(seconds).padStart(2, "0")}s`
 }
 
-function getVerdict(percent: number) {
+function getVerdict(percent: number, passingScore: number) {
   if (percent >= 90) {
     return { title: "Outstanding", tone: "success" as const }
   }
 
-  if (percent >= PASSING_SCORE) {
+  if (percent >= passingScore) {
     return { title: "Above the line", tone: "success" as const }
   }
 
-  if (percent >= 60) {
+  // "Close" scales with the bar, so a paper set at 60% does not call 61%
+  // "close" to a line it has already cleared.
+  if (percent >= passingScore - 15) {
     return { title: "Close", tone: "warning" as const }
   }
 
@@ -75,10 +82,11 @@ export const ResultSummary = memo(function ResultSummary({
   answeredCount,
   durationSeconds,
   label,
+  passingScore = PASSING_SCORE,
 }: ResultSummaryProps) {
   const theme = useThemePalette()
   const percent = Math.round((correctCount / Math.max(questionCount, 1)) * 100)
-  const verdict = getVerdict(percent)
+  const verdict = getVerdict(percent, passingScore)
 
   const accent =
     verdict.tone === "success"
@@ -108,9 +116,7 @@ export const ResultSummary = memo(function ResultSummary({
 
           <Text variant="caption">
             {correctCount} of {questionCount} correct
-            {percent >= PASSING_SCORE
-              ? ` · ${PASSING_SCORE}% is the board's line`
-              : ` · ${PASSING_SCORE}% is the board's line`}
+            {` · ${passingScore}% to pass`}
           </Text>
         </View>
 

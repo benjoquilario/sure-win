@@ -3,7 +3,7 @@ import Minus from "lucide-react-native/icons/minus"
 import Plus from "lucide-react-native/icons/plus"
 import { Pressable, View } from "react-native"
 
-import { withOpacity } from "@/lib/theme"
+import { cn } from "@/lib/utils"
 import { useThemePalette } from "@/hooks/use-theme"
 import { IconButton } from "@/components/ui/icon-button"
 import { Switch } from "@/components/ui/switch"
@@ -34,8 +34,10 @@ export const SettingsSwitchRow = memo(function SettingsSwitchRow({
 }: SwitchRowProps) {
   return (
     <View
-      className="flex-row items-center justify-between gap-4 py-2"
-      style={{ opacity: disabled ? 0.45 : 1 }}
+      className={cn(
+        "flex-row items-center justify-between gap-4 py-2",
+        disabled && "opacity-50"
+      )}
     >
       <View className="flex-1 gap-0.5">
         <Text variant="subheading" className="text-sm">
@@ -84,7 +86,6 @@ function OptionChip<T extends string>({
   isSelected: boolean
   onPress: (value: T) => void
 }) {
-  const theme = useThemePalette()
   const handlePress = useCallback(
     () => onPress(option.value),
     [onPress, option.value]
@@ -96,18 +97,21 @@ function OptionChip<T extends string>({
       accessibilityRole="radio"
       accessibilityState={{ selected: isSelected }}
       accessibilityLabel={option.label}
-      className="min-h-[44px] flex-1 justify-center rounded-md border px-3 py-2 active:opacity-90"
-      style={{
-        borderColor: isSelected ? theme.primary : theme.border,
-        borderWidth: isSelected ? 1.5 : 1,
-        backgroundColor: isSelected
-          ? withOpacity(theme.primary, 0.1)
-          : theme.card,
-      }}
+      // min-w lets a five-option row wrap on a 320pt phone instead of
+      // squeezing every label onto two lines.
+      className={cn(
+        "min-h-11 min-w-20 flex-1 justify-center rounded-md border px-3 py-2 active:opacity-90",
+        isSelected
+          ? "border-primary bg-primary/10"
+          : "border-border bg-card web:hover:bg-muted/60"
+      )}
+      style={{ borderWidth: isSelected ? 1.5 : 1 }}
     >
       <Text
-        className="text-center text-xs font-bold"
-        style={{ color: isSelected ? theme.primary : theme.mutedForeground }}
+        className={cn(
+          "text-center text-xs font-bold",
+          isSelected ? "text-primary" : "text-muted-foreground"
+        )}
       >
         {option.label}
       </Text>
@@ -204,7 +208,7 @@ export const SettingsStepperRow = memo(function SettingsStepperRow({
           <Minus size={16} color={theme.foreground} strokeWidth={2.4} />
         </IconButton>
 
-        <Text className="min-w-[64px] text-center text-sm font-extrabold text-card-foreground">
+        <Text className="min-w-16 text-center text-sm font-extrabold text-card-foreground">
           {formatValue ? formatValue(value) : value}
         </Text>
 

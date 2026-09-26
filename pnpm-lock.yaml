@@ -348,20 +348,26 @@ importers:
   functions/account-delete:
     dependencies:
       node-appwrite:
-        specifier: ^14.1.0
-        version: 14.2.0
+        specifier: ^22.1.3
+        version: 22.1.3
 
   functions/community-post-like-toggle:
     dependencies:
       node-appwrite:
-        specifier: ^14.1.0
-        version: 14.2.0
+        specifier: ^22.1.3
+        version: 22.1.3
+
+  functions/exam-questions:
+    dependencies:
+      node-appwrite:
+        specifier: ^22.1.3
+        version: 22.1.3
 
   functions/premium-material-access:
     dependencies:
       node-appwrite:
-        specifier: ^14.1.0
-        version: 14.2.0
+        specifier: ^22.1.3
+        version: 22.1.3
 
   packages/schema:
     devDependencies:
@@ -5409,9 +5415,6 @@ packages:
         optional: true
       sass:
         optional: true
-
-  node-appwrite@14.2.0:
-    resolution: {integrity: sha512-sPPA+JzdBJRS+lM6azX85y3/6iyKQYlHcXCbjMuWLROh6IiU9EfXRW3XSUTa5HDoBrlo8ve+AnVA6BIjQfUs1g==}
 
   node-appwrite@22.1.3:
     resolution: {integrity: sha512-pXxvojqgYY3HAiJAj+P6xb/CXVNsMUd+JXVOLrCCDzqZmpKeMF6OEt4mAoDEyKTnRaixUDHlPrdh7y1G/w3sbw==}
@@ -12849,10 +12852,6 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
-
-  node-appwrite@14.2.0:
-    dependencies:
-      node-fetch-native-with-agent: 1.7.2
 
   node-appwrite@22.1.3:
     dependencies:

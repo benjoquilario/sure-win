@@ -4,6 +4,7 @@ import { Pressable, View } from "react-native"
 
 import type { ThemePalette } from "@/lib/home-types"
 import type { LearningSubject } from "@/lib/learning-content"
+import { useGridColumns } from "@/hooks/use-layout"
 import { EmptyState } from "@/components/ui/empty-state"
 import { SectionHeader } from "@/components/ui/section-header"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -32,6 +33,8 @@ export const PracticeAreasSection = memo(function PracticeAreasSection({
   onPressSubject: (subject: LearningSubject) => void
   onPressSeeAll: () => void
 }) {
+  const columns = useGridColumns(320)
+
   return (
     <View className="gap-3">
       <SectionHeader
@@ -41,7 +44,8 @@ export const PracticeAreasSection = memo(function PracticeAreasSection({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`See all subjects, ${hiddenCount} more`}
-              className="flex-row items-center gap-0.5 py-1"
+              hitSlop={10}
+              className="flex-row items-center gap-0.5 py-1 active:opacity-70"
               onPress={onPressSeeAll}
             >
               <Text className="text-sm font-bold text-primary">See all</Text>
@@ -52,7 +56,7 @@ export const PracticeAreasSection = memo(function PracticeAreasSection({
       />
 
       {isLoading ? (
-        <View className="gap-2.5">
+        <View className="gap-3">
           {SKELETON_ROWS.map((row) => (
             <Skeleton key={row} className="h-[70px] rounded-xl" />
           ))}
@@ -69,14 +73,21 @@ export const PracticeAreasSection = memo(function PracticeAreasSection({
           description="Add Appwrite subject and topic records to populate this list."
         />
       ) : (
-        <View className="gap-2.5">
+        // Half-gap cells inside a row pulled back by the same amount, so the
+        // grid's outer edges stay on the section's edges.
+        <View className="-m-1.5 flex-row flex-wrap">
           {subjects.map((subject) => (
-            <HomeSubjectRow
+            <View
               key={subject.id}
-              subject={subject}
-              theme={theme}
-              onPress={onPressSubject}
-            />
+              className="p-1.5"
+              style={{ width: `${100 / columns}%` }}
+            >
+              <HomeSubjectRow
+                subject={subject}
+                theme={theme}
+                onPress={onPressSubject}
+              />
+            </View>
           ))}
         </View>
       )}

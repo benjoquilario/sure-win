@@ -6,6 +6,7 @@ import type {
   FontScale,
   MemberSettings,
 } from "@/lib/member/settings"
+
 import {
   SettingsOptionRow,
   SettingsSwitchRow,

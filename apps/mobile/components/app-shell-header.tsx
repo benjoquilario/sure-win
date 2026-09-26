@@ -14,6 +14,10 @@ type AppShellHeaderProps = {
 
 /**
  * Top-of-screen header used by tab screens: eyebrow · title · subtitle.
+ *
+ * No horizontal padding of its own. Screens place it in a `ContentFrame` or
+ * inside a padded list, and an extra inset here would knock the title a few
+ * points off the edge of the cards below it.
  */
 export function AppShellHeader({
   eyebrow,
@@ -23,26 +27,26 @@ export function AppShellHeader({
   compact = false,
 }: AppShellHeaderProps) {
   return (
-    <View className={compact ? "gap-4 px-1" : "gap-5 px-1"}>
-      <View className="flex-row items-start justify-between gap-4">
-        <View className="flex-1 gap-1.5">
-          {eyebrow ? <Text variant="eyebrow">{eyebrow}</Text> : null}
+    <View className="flex-row items-start justify-between gap-4">
+      <View
+        className={compact ? "min-w-0 flex-1 gap-1" : "min-w-0 flex-1 gap-1.5"}
+      >
+        {eyebrow ? <Text variant="eyebrow">{eyebrow}</Text> : null}
 
-          <Text
-            variant="title"
-            className={compact ? undefined : "text-2xl leading-8"}
-          >
-            {title}
+        <Text
+          variant="title"
+          className={compact ? undefined : "text-2xl leading-8"}
+        >
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text variant="callout" className="text-muted-foreground">
+            {subtitle}
           </Text>
-          {subtitle ? (
-            <Text variant="callout" className="text-muted-foreground">
-              {subtitle}
-            </Text>
-          ) : null}
-        </View>
-
-        {trailing ?? null}
+        ) : null}
       </View>
+
+      {trailing ?? null}
     </View>
   )
 }

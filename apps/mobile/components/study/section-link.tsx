@@ -34,7 +34,7 @@ export const SectionLink = memo(function SectionLink({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       hitSlop={10}
-      className="flex-row items-center gap-0.5 active:opacity-70"
+      className="flex-row items-center gap-0.5 active:opacity-70 web:hover:opacity-80"
       onPress={onPress}
     >
       <Text className="text-xs font-semibold text-primary">{label}</Text>

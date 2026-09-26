@@ -2,9 +2,11 @@ import { memo } from "react"
 import KeyRound from "lucide-react-native/icons/key-round"
 import MailCheck from "lucide-react-native/icons/mail-check"
 import Stethoscope from "lucide-react-native/icons/stethoscope"
+
 import { useThemePalette } from "@/hooks/use-theme"
 import { Button } from "@/components/ui/button"
 import { Text } from "@/components/ui/text"
+
 import { SettingsSection } from "./settings-section"
 
 /**
@@ -35,13 +37,10 @@ export const AccountSection = memo(function AccountSection({
   const theme = useThemePalette()
 
   return (
-    <SettingsSection
-      title="Account"
-      description={email || "Signed in"}
-    >
+    <SettingsSection title="Account" description={email || "Signed in"}>
       <Button
         variant="outline"
-        className="h-11 justify-start"
+        className="justify-start"
         onPress={onChangeEmail}
       >
         <MailCheck size={16} color={theme.primary} strokeWidth={2.2} />
@@ -50,7 +49,7 @@ export const AccountSection = memo(function AccountSection({
 
       <Button
         variant="outline"
-        className="h-11 justify-start"
+        className="justify-start"
         onPress={onChangePassword}
       >
         <KeyRound size={16} color={theme.primary} strokeWidth={2.2} />
@@ -60,7 +59,7 @@ export const AccountSection = memo(function AccountSection({
       {!isEmailVerified ? (
         <Button
           variant="outline"
-          className="h-11 justify-start"
+          className="justify-start"
           onPress={onSendVerification}
         >
           <MailCheck size={16} color={theme.accentText} strokeWidth={2.2} />
@@ -70,10 +69,14 @@ export const AccountSection = memo(function AccountSection({
 
       <Button
         variant="ghost"
-        className="h-11 justify-start"
+        className="justify-start"
         onPress={onOpenDiagnostics}
       >
-        <Stethoscope size={16} color={theme.mutedForeground} strokeWidth={2.2} />
+        <Stethoscope
+          size={16}
+          color={theme.mutedForeground}
+          strokeWidth={2.2}
+        />
         <Text className="font-bold">Run connection diagnostics</Text>
       </Button>
     </SettingsSection>

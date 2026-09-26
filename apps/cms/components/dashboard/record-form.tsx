@@ -35,9 +35,16 @@ type RecordFormProps = {
    * its own title and border.
    */
   bare?: boolean;
+  /**
+   * Whether this person may change "Visible in the app". When they may not,
+   * the switch is locked - at off for a new row - so the form cannot offer a
+   * save the server is going to refuse.
+   */
+  canPublish?: boolean;
 };
 
 const RELATION_NONE_VALUE = "__none__";
+const PUBLISH_FIELD_KEY = "isPublished";
 
 function formatDateTimeValue(value: unknown) {
   if (typeof value !== "string" || !value) {
@@ -80,6 +87,7 @@ export function RecordForm({
   row,
   relationOptions,
   bare = false,
+  canPublish = true,
 }: RecordFormProps) {
   const definition = getReviewerTableDefinition(tableKey);
   const fields = definition.fields as readonly CmsFieldDefinition[];
@@ -101,7 +109,11 @@ export function RecordForm({
         .filter((field) => field.kind === "boolean")
         .map((field) => [
           field.key,
-          Boolean(row?.[field.key] ?? field.defaultValue),
+          // Someone who cannot publish starts a new row hidden, whatever the
+          // table's default, so creating one is never a publish.
+          !row && !canPublish && field.key === PUBLISH_FIELD_KEY
+            ? false
+            : Boolean(row?.[field.key] ?? field.defaultValue),
         ]),
     ),
   );
@@ -258,12 +270,10 @@ export function RecordForm({
                   </div>
 
                   {field.readOnly ? (
+                    // Display only. No hidden input: the server owns this value
+                    // and ignores it on save, so echoing it back would only
+                    // invite a stale count to be written over a fresh one.
                     <>
-                      <input
-                        type="hidden"
-                        name={field.key}
-                        value={stringifyValue(fieldValue ?? field.defaultValue)}
-                      />
                       <div className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
                         {stringifyValue(fieldValue) ||
                           field.placeholder ||
@@ -312,9 +322,13 @@ export function RecordForm({
                         <p className="text-xs text-muted-foreground">
                           {field.description ??
                             `Turn on to enable ${field.label.toLowerCase()}.`}
+                          {!canPublish && field.key === PUBLISH_FIELD_KEY
+                            ? " Only a moderator or admin can change this."
+                            : null}
                         </p>
                       </div>
                       <Switch
+                        disabled={!canPublish && field.key === PUBLISH_FIELD_KEY}
                         checked={switchValues[field.key]}
                         onCheckedChange={(checked) =>
                           setSwitchValues((current) => ({
