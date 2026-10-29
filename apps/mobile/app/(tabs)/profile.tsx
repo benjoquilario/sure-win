@@ -7,12 +7,13 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import * as ImagePicker from "expo-image-picker"
 import { useRouter } from "expo-router"
+import Settings from "lucide-react-native/icons/settings"
 import { Alert, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import { useAppPreferences } from "@/lib/app-preferences"
 import { getAvatarUrl, getInitials } from "@/lib/auth"
-import { buildExamCountdown } from "@/lib/exam-countdown"
+import { buildExamCountdown, parseExamDate } from "@/lib/exam-countdown"
 import { prepareImageForUpload } from "@/lib/image-upload"
 import { listLearningSubjects } from "@/lib/learning-content"
 import { getMembership } from "@/lib/member/membership"
@@ -26,23 +27,21 @@ import {
   buildSubjectProgressItems,
 } from "@/lib/study-dashboard"
 import { useContentPadding, useGridColumns } from "@/hooks/use-layout"
-import { useIsPremium, useSubscription } from "@/hooks/use-membership"
+import { useIsPremium } from "@/hooks/use-membership"
 import { useThemePalette } from "@/hooks/use-theme"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { DatePickerDialog } from "@/components/ui/date-picker-dialog"
+import { IconButton } from "@/components/ui/icon-button"
 import { FadeInView } from "@/components/ui/motion"
-import { Text } from "@/components/ui/text"
 import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 import { AppShellHeader } from "@/components/app-shell-header"
-import { MemberIdentityRows } from "@/components/member/member-identity-row"
-import { MembershipCard } from "@/components/member/membership-card"
 import {
   AchievementsSection,
+  ExamReadinessCard,
   getAchievementBadgeMeta,
   ProfileEditDialog,
-  ProfileIdentityCard,
+  ProfileOverviewCard,
   ProfileProgressCard,
-  ProfileTopBar,
+  ProfileStatsGrid,
   ProfileVerifyEmailCard,
   type AchievementCardItem,
 } from "@/components/profile"
@@ -55,6 +54,21 @@ import {
 const SUBJECT_PREVIEW_COUNT = 6
 const ACHIEVEMENT_PREVIEW_COUNT = 6
 const RECENT_ACTIVITY_COUNT = 4
+
+/**
+ * ─── My Profile ───────────────────────────────────────────────────────────
+ *
+ * Laid out like an account page in a professional tool: who you are and what
+ * your plan is first, then where you stand for the exam, then the detail
+ * behind it, then the facts you can edit. On a tablet or browser it splits
+ * into two columns, account on the left and performance on the right, so the
+ * page reads across instead of scrolling a single narrow strip.
+ */
+
+/** "Retaker", not "Retaker - has sat the board exam before". */
+function toShortMemberType(label: string) {
+  return label.split(" - ")[0]?.trim() || label
+}
 
 const ACHIEVEMENT_DATE_FMT = new Intl.DateTimeFormat("en-PH", {
   month: "short",
@@ -71,14 +85,14 @@ function ProfileScreenContent() {
   const updateProfile = useAuth((state) => state.updateProfile)
   const sendVerificationEmail = useAuth((state) => state.sendVerificationEmail)
 
-  const contentPadding = useContentPadding()
-  // Identity on the left, membership and details stacked on the right, once
-  // each column keeps 360pt. Stacked on a tablet they are three very wide,
-  // very short panels.
-  const pairCards = useGridColumns(360) >= 2
-  const pairCellStyle = pairCards ? { flex: 1 } : undefined
+  const contentPadding = useContentPadding("wide")
+  // Account column and performance column side by side once each keeps
+  // 380pt, which is a portrait iPad and up.
+  const isTwoColumn = useGridColumns(380, "wide", 2) >= 2
 
   const examDate = useAppPreferences((state) => state.preferences.examDate)
+  const setPreference = useAppPreferences((state) => state.setPreference)
+  const [isExamPickerOpen, setIsExamPickerOpen] = useState(false)
   const [isSendingVerification, setIsSendingVerification] = useState(false)
   // Flag *and* date — the cached flag alone keeps a lapsed member premium
   // until a server sweep catches up (section 6).
@@ -122,11 +136,11 @@ function ProfileScreenContent() {
 
   // Who they said they are, or "Not said" — never a guess, and never a role.
   const roleLabel = getMemberTypeDisplay(profile)
+  const shortRoleLabel = profile?.memberType
+    ? toShortMemberType(roleLabel)
+    : null
   // The paywall answer, date included — never the cached flag on its own.
   const membership = useMemo(() => getMembership(profile), [profile])
-  // The row the server actually reads, rather than the four fields it caches
-  // onto the profile afterwards. Empty for anybody who has never subscribed.
-  const subscription = useSubscription()
   const school = profile?.schoolOrEmployer ?? undefined
 
   // ─── Data ───────────────────────────────────────────────────────
@@ -177,6 +191,16 @@ function ProfileScreenContent() {
   const progressSummary = useMemo(
     () => buildStudyProgressSummary(allSubjectItems, activityFeed),
     [activityFeed, allSubjectItems]
+  )
+
+  // The sittings the average score is built from, so the readiness verdict
+  // can say how much evidence is behind it.
+  const completedSittings = useMemo(
+    () =>
+      (activityFeed?.sessions ?? []).filter(
+        (session) => session.status === "completed"
+      ).length,
+    [activityFeed]
   )
 
   const achievementItems = useMemo<AchievementCardItem[]>(
@@ -236,6 +260,34 @@ function ProfileScreenContent() {
   const goToSettings = useCallback(() => router.push("/settings"), [router])
   const goToDashboard = useCallback(() => router.push("/dashboard"), [router])
   const goToLearn = useCallback(() => router.push("/learn"), [router])
+  const goToPremium = useCallback(() => router.push("/premium"), [router])
+  const goToPractice = useCallback(() => router.push("/mode"), [router])
+
+  const handleConfirmExamDate = useCallback(
+    (date: Date) => {
+      // 8:00 AM, when Philippine licensure exams start: the same time Home
+      // and Settings store, so the three never disagree.
+      setPreference(
+        "examDate",
+        new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate(),
+          8,
+          0,
+          0,
+          0
+        ).toISOString()
+      )
+      setIsExamPickerOpen(false)
+    },
+    [setPreference]
+  )
+
+  const handleClearExamDate = useCallback(() => {
+    setPreference("examDate", null)
+    setIsExamPickerOpen(false)
+  }, [setPreference])
 
   const openEditDialog = useCallback(() => {
     openProfileEditDialog({
@@ -375,29 +427,122 @@ function ProfileScreenContent() {
 
   // ─── Render ─────────────────────────────────────────────────────
 
+  const overview = (
+    <ProfileOverviewCard
+      displayName={displayName}
+      email={email}
+      initials={initials}
+      avatarUrl={avatarSource}
+      memberTypeLabel={shortRoleLabel}
+      school={school ?? null}
+      licenseNumber={
+        profile?.memberType === "professional"
+          ? (profile.licenseNumber ?? null)
+          : null
+      }
+      memberSince={profile?.createdAt ?? user?.$createdAt ?? null}
+      isVerified={emailVerified}
+      membership={membership}
+      onEdit={openEditDialog}
+      onManagePlan={goToPremium}
+    />
+  )
+
+  // The Membership card, Personal details list and Shortcuts list that used
+  // to follow are gone: the overview now carries the plan row and every fact
+  // they listed, editing is its pencil, Settings is the header button, and
+  // the dashboard is "View details" on the progress card.
+
+  const readinessBlock = (
+    <View className="gap-3">
+      <ExamReadinessCard
+        isLoading={activityQuery.isLoading}
+        averageScore={progressSummary.averageScore}
+        sittings={completedSittings}
+        countdown={countdown}
+        onSetExamDate={() => setIsExamPickerOpen(true)}
+        onPractice={goToPractice}
+      />
+      <ProfileStatsGrid
+        isLoading={activityQuery.isLoading || performanceQuery.isLoading}
+        questionsAnswered={
+          performanceQuery.data?.totalAnswered ??
+          progressSummary.questionsSolved
+        }
+        accuracyPercent={performanceQuery.data?.correctPercent ?? 0}
+        dayStreak={progressSummary.dayStreak}
+        hoursStudied={progressSummary.hoursStudied}
+      />
+    </View>
+  )
+
+  const progressBlocks = (
+    <>
+      <FadeInView delay={getStaggerDelay(3)}>
+        <ProfileProgressCard
+          theme={theme}
+          isLoading={activityQuery.isLoading || subjectsQuery.isLoading}
+          progressPercent={progressSummary.progressPercent}
+          topicsStudied={progressSummary.topicsStudied}
+          topicsTotal={progressSummary.topicsTotal}
+          onPressViewDetails={goToDashboard}
+        />
+      </FadeInView>
+
+      <FadeInView delay={getStaggerDelay(4)}>
+        <SubjectProgressSection
+          theme={theme}
+          title="Subjects"
+          items={subjectItems}
+          isLoading={subjectsQuery.isLoading}
+          errorMessage={subjectsErrorMessage}
+          onPressItem={handlePressSubject}
+          onPressSeeAll={goToLearn}
+        />
+      </FadeInView>
+
+      <FadeInView delay={getStaggerDelay(5)}>
+        <AchievementsSection
+          theme={theme}
+          items={achievementItems}
+          isLoading={activityQuery.isLoading}
+          onPressSeeAll={goToDashboard}
+        />
+      </FadeInView>
+
+      <FadeInView delay={getStaggerDelay(6)}>
+        <RecentActivitySection
+          theme={theme}
+          items={recentActivityItems}
+          isLoading={activityQuery.isLoading}
+          errorMessage={activityErrorMessage}
+          onPressSeeAll={goToDashboard}
+        />
+      </FadeInView>
+    </>
+  )
+
   return (
     <SafeAreaView
       className="flex-1 bg-background"
       edges={["top", "left", "right"]}
     >
       <ScrollView
-        contentContainerClassName="gap-6 pt-1"
+        contentContainerClassName="gap-4 pt-3"
         contentContainerStyle={{ ...contentPadding, paddingBottom: 32 }}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       >
-        <ProfileTopBar
-          theme={theme}
-          onPressMenu={goToSettings}
-          onPressSettings={goToSettings}
+        <AppShellHeader
+          compact
+          eyebrow="Account"
+          title="My Profile"
+          trailing={
+            <IconButton label="Settings" variant="soft" onPress={goToSettings}>
+              <Settings size={20} color={theme.primary} strokeWidth={2.2} />
+            </IconButton>
+          }
         />
-
-        <FadeInView delay={getStaggerDelay(0)}>
-          <AppShellHeader
-            title="My Profile"
-            subtitle="Stay consistent. Your future self will thank you."
-          />
-        </FadeInView>
 
         {!emailVerified ? (
           <ProfileVerifyEmailCard
@@ -408,97 +553,38 @@ function ProfileScreenContent() {
           />
         ) : null}
 
-        <View className={pairCards ? "flex-row items-start gap-5" : "gap-6"}>
-          <FadeInView delay={getStaggerDelay(1)} style={pairCellStyle}>
-            <ProfileIdentityCard
-              theme={theme}
-              displayName={displayName}
-              initials={initials}
-              avatarUrl={avatarSource}
-              roleLabel={roleLabel}
-              subtitle={school || "Add your school or review centre"}
-              isSubtitlePlaceholder={!school}
-              isVerified={emailVerified}
-              daysLeftLabel={countdown ? countdown.daysLabel : "—"}
-              questionsSolved={progressSummary.questionsSolved}
-              averageScore={progressSummary.averageScore}
-              dayStreak={progressSummary.dayStreak}
-              onPressEdit={openEditDialog}
-            />
-          </FadeInView>
+        {isTwoColumn ? (
+          <View className="flex-row items-start gap-5">
+            <View className="gap-4" style={{ flex: 2 }}>
+              <FadeInView delay={getStaggerDelay(0)}>{overview}</FadeInView>
+              <FadeInView delay={getStaggerDelay(1)}>
+                {readinessBlock}
+              </FadeInView>
+            </View>
 
-          <View className="gap-6" style={pairCellStyle}>
-            <FadeInView delay={getStaggerDelay(2)}>
-              <MembershipCard
-                membership={membership}
-                subscriptionDetail={subscription.description?.detail}
-                onUpgrade={() => router.push("/premium")}
-              />
-            </FadeInView>
-
-            <FadeInView delay={getStaggerDelay(3)}>
-              <Card>
-                <CardContent className="gap-2">
-                  <Text variant="label">About you</Text>
-                  <MemberIdentityRows profile={profile} />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="self-start"
-                    onPress={openEditDialog}
-                  >
-                    <Text>Edit details</Text>
-                  </Button>
-                </CardContent>
-              </Card>
-            </FadeInView>
+            <View className="gap-4" style={{ flex: 3 }}>
+              {progressBlocks}
+            </View>
           </View>
-        </View>
-
-        <FadeInView delay={getStaggerDelay(4)}>
-          <ProfileProgressCard
-            theme={theme}
-            isLoading={activityQuery.isLoading || subjectsQuery.isLoading}
-            progressPercent={progressSummary.progressPercent}
-            topicsStudied={progressSummary.topicsStudied}
-            topicsTotal={progressSummary.topicsTotal}
-            hoursStudied={progressSummary.hoursStudied}
-            accuracyRate={performanceQuery.data?.correctPercent ?? 0}
-            onPressViewDetails={goToDashboard}
-          />
-        </FadeInView>
-
-        <FadeInView delay={getStaggerDelay(3)}>
-          <AchievementsSection
-            theme={theme}
-            items={achievementItems}
-            isLoading={activityQuery.isLoading}
-            onPressSeeAll={goToDashboard}
-          />
-        </FadeInView>
-
-        <FadeInView delay={getStaggerDelay(4)}>
-          <SubjectProgressSection
-            theme={theme}
-            title="Subjects Progress"
-            items={subjectItems}
-            isLoading={subjectsQuery.isLoading}
-            errorMessage={subjectsErrorMessage}
-            onPressItem={handlePressSubject}
-            onPressSeeAll={goToLearn}
-          />
-        </FadeInView>
-
-        <FadeInView delay={getStaggerDelay(5)}>
-          <RecentActivitySection
-            theme={theme}
-            items={recentActivityItems}
-            isLoading={activityQuery.isLoading}
-            errorMessage={activityErrorMessage}
-            onPressSeeAll={goToDashboard}
-          />
-        </FadeInView>
+        ) : (
+          <>
+            <FadeInView delay={getStaggerDelay(0)}>{overview}</FadeInView>
+            <FadeInView delay={getStaggerDelay(1)}>{readinessBlock}</FadeInView>
+            {progressBlocks}
+          </>
+        )}
       </ScrollView>
+
+      <DatePickerDialog
+        open={isExamPickerOpen}
+        onOpenChange={setIsExamPickerOpen}
+        value={parseExamDate(examDate)}
+        title="Your board exam date"
+        description="Your profile and Home count down the days to it."
+        confirmLabel="Save exam date"
+        onConfirm={handleConfirmExamDate}
+        onClear={examDate ? handleClearExamDate : undefined}
+      />
 
       <ProfileEditDialog
         open={isEditOpen}

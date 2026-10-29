@@ -1,13 +1,14 @@
 import Check from "lucide-react-native/icons/check"
 import X from "lucide-react-native/icons/x"
-import { Pressable, View, type PressableProps } from "react-native"
+import { View, type PressableProps } from "react-native"
+
+import { toChoiceLabel } from "@workspace/schema"
 
 import { withOpacity, type ThemePalette } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { useThemePalette } from "@/hooks/use-theme"
+import { MotionPressable } from "@/components/ui/motion"
 import { Text } from "@/components/ui/text"
-
-import { toChoiceLabel } from "@workspace/schema"
 
 /**
  * The label is passed in, not looked up.
@@ -36,11 +37,7 @@ import { toChoiceLabel } from "@workspace/schema"
  *   missed    graded: the right answer, which the learner did not pick
  */
 export type AnswerOptionState =
-  | "idle"
-  | "selected"
-  | "correct"
-  | "incorrect"
-  | "missed"
+  "idle" | "selected" | "correct" | "incorrect" | "missed"
 
 type AnswerOptionColors = {
   baseBorder: string
@@ -141,14 +138,18 @@ export function AnswerOption({
   const backgroundColor =
     state === "idle"
       ? palette.baseBackground
-      : withOpacity(accentColor, state === "missed" ? 0.07 : 0.12)
+      : withOpacity(
+          accentColor,
+          state === "missed" ? 0.07 : state === "selected" ? 0.08 : 0.12
+        )
 
-  // Filled badge for a chosen or resolved option; outlined while idle.
+  // Filled badge for a chosen or resolved option; an empty ring while idle, so
+  // an untouched list reads as a column of unchecked radios.
   const badgeBackground = isEmphasised
     ? state === "missed"
       ? withOpacity(accentColor, 0.18)
       : accentColor
-    : withOpacity(theme.muted, 0.9)
+    : "transparent"
   const badgeText = isEmphasised
     ? state === "missed"
       ? accentColor
@@ -168,20 +169,17 @@ export function AnswerOption({
     .join(". ")
 
   return (
-    <Pressable
+    <MotionPressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="radio"
       accessibilityState={{
-        checked: state === "selected" || state === "correct" || state === "incorrect",
+        checked:
+          state === "selected" || state === "correct" || state === "incorrect",
         disabled,
       }}
       accessibilityLabel={accessibilityLabel}
-      className={cn(
-        "rounded-md border px-4 py-3.5",
-        !disabled && "active:opacity-90",
-        className
-      )}
+      className={cn("rounded-md border px-4 py-3.5", className)}
       style={{
         borderColor: accentColor,
         backgroundColor,
@@ -191,8 +189,12 @@ export function AnswerOption({
     >
       <View className="flex-row items-center gap-3">
         <View
-          className="h-8 w-8 items-center justify-center rounded-sm"
-          style={{ backgroundColor: badgeBackground }}
+          className="h-8 w-8 items-center justify-center rounded-full"
+          style={{
+            backgroundColor: badgeBackground,
+            borderWidth: isEmphasised ? 0 : 1.5,
+            borderColor: palette.baseBorder,
+          }}
         >
           <Text className="text-xs font-black" style={{ color: badgeText }}>
             {letter}
@@ -227,7 +229,7 @@ export function AnswerOption({
           <X size={19} color={accentColor} strokeWidth={3} />
         ) : null}
       </View>
-    </Pressable>
+    </MotionPressable>
   )
 }
 

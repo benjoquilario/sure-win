@@ -1,6 +1,8 @@
 import { memo } from "react"
 import ChevronLeft from "lucide-react-native/icons/chevron-left"
 import ChevronRight from "lucide-react-native/icons/chevron-right"
+import CircleCheck from "lucide-react-native/icons/circle-check"
+import Send from "lucide-react-native/icons/send"
 
 import type { FeedbackTiming } from "@/lib/member/settings"
 import { useThemePalette } from "@/hooks/use-theme"
@@ -82,6 +84,11 @@ export const SessionFooter = memo(function SessionFooter({
 
       {needsConfirm ? (
         <Button size="xl" className="flex-1" onPress={onConfirm}>
+          <CircleCheck
+            size={18}
+            color={theme.primaryForeground}
+            strokeWidth={2.4}
+          />
           <Text>Check answer</Text>
         </Button>
       ) : isLast ? (
@@ -91,6 +98,7 @@ export const SessionFooter = memo(function SessionFooter({
           disabled={isSubmitting}
           onPress={onSubmit}
         >
+          <Send size={17} color={theme.primaryForeground} strokeWidth={2.4} />
           <Text>{isSubmitting ? "Submitting…" : "Submit"}</Text>
         </Button>
       ) : (

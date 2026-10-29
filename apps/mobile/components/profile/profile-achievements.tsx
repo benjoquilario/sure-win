@@ -3,6 +3,7 @@ import BookOpen from "lucide-react-native/icons/book-open"
 import CheckCircle2 from "lucide-react-native/icons/circle-check"
 import Flame from "lucide-react-native/icons/flame"
 import Star from "lucide-react-native/icons/star"
+
 import type { ActivityAchievement } from "@/lib/progress"
 import type { Tone } from "@/lib/tone"
 

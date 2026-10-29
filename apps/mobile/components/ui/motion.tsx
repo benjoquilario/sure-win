@@ -69,11 +69,17 @@ export function FadeInView({
 type MotionPressableProps = PressableProps & {
   disableMotion?: boolean
   scaleTo?: number
+  /**
+   * Style for the animated wrapper. `{ flex: 1 }` lets the pressable fill a
+   * stretched parent, so tiles in a row can share the tallest one's height.
+   */
+  containerStyle?: StyleProp<ViewStyle>
 }
 
 export function MotionPressable({
   disableMotion = false,
   scaleTo = MOTION.pressScale,
+  containerStyle,
   onPressIn,
   onPressOut,
   style,
@@ -94,7 +100,7 @@ export function MotionPressable({
   }))
 
   return (
-    <Animated.View style={animatedStyle}>
+    <Animated.View style={[containerStyle, animatedStyle]}>
       <Pressable
         {...props}
         style={style}
