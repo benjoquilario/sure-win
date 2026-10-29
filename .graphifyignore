@@ -1,0 +1,58 @@
+# graphify reads this file INSTEAD of .gitignore, so the build/dependency
+# rules from .gitignore are repeated here.
+
+# dependencies and build output
+node_modules/
+.turbo/
+.next/
+out/
+build/
+dist/
+web-build/
+.expo/
+coverage/
+apps/mobile/ios/
+apps/mobile/android/
+*.tsbuildinfo
+next-env.d.ts
+expo-env.d.ts
+pnpm-lock.yaml
+
+# secrets
+.env
+.env.*
+*.pem
+*.key
+*.jks
+*.p8
+*.p12
+
+# graphify's own output
+graphify-out/
+
+# vendored agent skills - third-party docs, not this project
+.agents/
+.claude/
+
+# editor config
+.vscode/
+
+# exam question content, not project structure
+apps/cms/sw-foundation-appendices.txt
+
+# superseded mobile contracts - MOBILE-SCHEMA-NOTES-v6.md is the current one
+docs/schema/MOBILE-SCHEMA-NOTES.md
+docs/schema/MOBILE-SCHEMA-NOTES-v[2-5].md
+
+# binary assets: app icons, splash screens, the UI/UX playbook PDF
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.ico
+*.pdf
+*.webm
+*.mp4
+*.mov
