@@ -27,7 +27,10 @@ All `POST` with a JSON body. The caller must be signed in (Appwrite supplies
 
 ## Console settings
 
-- Runtime: Node 20 or later. Entrypoint `main.js`. Build command `npm install`.
+- Runtime: **Node 22** (20-25 work). Not Node 26: its undici 8 rejects the
+  undici 6 agent node-appwrite 22 hands to `fetch`, so every call fails with
+  `fetch failed` and members see "Questions could not be loaded". Entrypoint
+  `main.js`. Build command `npm install`.
 - Execute access: **Users** (any signed-in member).
 - Scopes: `rows.read` (older consoles call it `documents.read`). The runtime key
   from those scopes is used; `APPWRITE_API_KEY` is only a fallback.
