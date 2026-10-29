@@ -697,6 +697,8 @@ export async function applyGooglePurchase(input: {
    */
   linkedPurchaseToken?: string;
   obfuscatedAccountId?: string;
+  /** A license tester's purchase: grants access, but is not revenue. */
+  isTestPurchase?: boolean;
 }) {
   const { tables } = getAdminServices();
 
@@ -830,8 +832,18 @@ async function recordGoogleCharge(input: {
   productId: string;
   priceCharged?: number;
   kind?: "initial" | "renewal";
+  isTestPurchase?: boolean;
 }) {
   if (!input.orderId) {
+    return;
+  }
+
+  // License testers are charged nothing and renew every few minutes; written
+  // to `payments` at the plan price they would swamp the revenue figures.
+  if (input.isTestPurchase) {
+    console.info(
+      `[billing] test purchase ${input.orderId} not recorded as revenue.`,
+    );
     return;
   }
 
@@ -903,6 +915,9 @@ export async function applyGoogleNotification(input: {
    */
   expiresAt?: string;
   autoRenewing?: boolean;
+  /** Play's latest order id - a renewal's own charge. */
+  orderId?: string;
+  isTestPurchase?: boolean;
 }) {
   const { tables } = getAdminServices();
 
@@ -983,6 +998,24 @@ export async function applyGoogleNotification(input: {
 
   await syncMembershipFromSubscriptions(userId);
   await syncPlanSubscriberCounts();
+
+  // Both are a successful charge: RENEWED on schedule, RECOVERED after the card
+  // failed and was fixed. The unique index on `orderId` makes a redelivered
+  // notification hit the constraint instead of counting the charge twice.
+  if (
+    input.notificationType === GOOGLE_NOTIFICATION.RENEWED ||
+    input.notificationType === GOOGLE_NOTIFICATION.RECOVERED
+  ) {
+    await recordGoogleCharge({
+      userId,
+      subscriptionId: String(row.$id),
+      orderId: input.orderId ?? "",
+      purchaseToken: input.purchaseToken,
+      productId: String(row.productId ?? ""),
+      kind: "renewal",
+      isTestPurchase: input.isTestPurchase,
+    });
+  }
 
   if (input.notificationType === GOOGLE_NOTIFICATION.RENEWED) {
     await logActivity({

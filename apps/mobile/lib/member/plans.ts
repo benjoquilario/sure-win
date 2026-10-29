@@ -1,6 +1,7 @@
+import { formatMoney, type SubscriptionPlanDocument } from "@workspace/schema"
+
 import { Query } from "../appwrite"
 import { assertContentConfigured, listAll } from "../db"
-import { formatMoney, type SubscriptionPlanDocument } from "@workspace/schema"
 
 /**
  * ─── Plans ────────────────────────────────────────────────────────────────
@@ -89,6 +90,11 @@ export function describeBillingPeriod(plan: SubscriptionPlan) {
     return "per year"
   }
 
+  // Before the quarter check, or `premium_6months` (180 days) reads "per quarter".
+  if (plan.durationDays >= 170) {
+    return "every 6 months"
+  }
+
   if (plan.durationDays >= 85) {
     return "per quarter"
   }
@@ -119,17 +125,18 @@ export function getMonthlyEquivalent(plan: SubscriptionPlan) {
 }
 
 /**
- * The saving against the cheapest monthly plan, as a percentage.
+ * The saving against paying monthly for the same length of time, as a
+ * percentage. Null for the monthly plan itself and for anything not cheaper.
  *
  * Computed from what the CMS actually charges rather than assumed. The old
  * screen hardcoded "20% off", which stopped being true the first time somebody
  * changed a price in the dashboard — and nobody would have noticed.
  */
-export function getYearlySavingPercent(
+export function getSavingPercent(
   plan: SubscriptionPlan,
   plans: SubscriptionPlan[]
 ) {
-  if (!plan.isRecurring || plan.durationDays < 360) {
+  if (!plan.isRecurring || plan.durationDays < 60) {
     return null
   }
 
@@ -141,8 +148,8 @@ export function getYearlySavingPercent(
     return null
   }
 
-  const yearAtMonthlyRate = monthly.price * 12
-  const saving = yearAtMonthlyRate - plan.price
+  const atMonthlyRate = monthly.price * Math.round(plan.durationDays / 30)
+  const saving = atMonthlyRate - plan.price
 
-  return saving > 0 ? Math.round((saving / yearAtMonthlyRate) * 100) : null
+  return saving > 0 ? Math.round((saving / atMonthlyRate) * 100) : null
 }

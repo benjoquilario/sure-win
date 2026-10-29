@@ -86,14 +86,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await verifyAndApplyPurchase({
-    userId,
-    purchaseToken: String(body.purchaseToken ?? "").trim(),
-    productId: String(body.productId ?? "").trim(),
-    orderId: String(body.orderId ?? "").trim() || undefined,
-    expectedObfuscatedAccountId:
-      String(body.obfuscatedAccountId ?? "").trim() || undefined,
-  });
+  let result: Awaited<ReturnType<typeof verifyAndApplyPurchase>>;
+
+  try {
+    result = await verifyAndApplyPurchase({
+      userId,
+      purchaseToken: String(body.purchaseToken ?? "").trim(),
+      productId: String(body.productId ?? "").trim(),
+      orderId: String(body.orderId ?? "").trim() || undefined,
+      expectedObfuscatedAccountId:
+        String(body.obfuscatedAccountId ?? "").trim() || undefined,
+    });
+  } catch (error) {
+    // Anything unforeseen still answers in the documented shape. A bare 500
+    // page is not JSON, and the member's app would have nothing to act on.
+    console.error("[billing] verify threw:", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Could not finish verifying that purchase. Try again shortly.",
+      },
+      { status: 503 },
+    );
+  }
 
   if (!result.ok) {
     return NextResponse.json(

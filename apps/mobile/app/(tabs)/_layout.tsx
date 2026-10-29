@@ -2,10 +2,14 @@ import React, { useCallback } from "react"
 import { Tabs, useRouter } from "expo-router"
 
 import { SideNavInsetContext, useSideNavWidth } from "@/hooks/use-layout"
+import { useRestorePlayPurchases } from "@/hooks/use-restore-play-purchases"
 import { StudyTabBar } from "@/components/navigation/StudyTabBar"
 
 export default function TabLayout() {
   const router = useRouter()
+  // The signed-in shell: finish any Play purchase a previous session paid for
+  // but never got to report.
+  useRestorePlayPurchases()
   // 0 on phones and portrait tablets (bottom bar), the rail or sidebar width
   // from 1024pt up. Tab screens read it through the context to measure the
   // space beside the navigation rather than the whole window.

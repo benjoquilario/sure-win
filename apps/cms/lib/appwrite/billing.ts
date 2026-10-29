@@ -21,6 +21,7 @@ import {
   getPlayPackageName,
   getSubscriptionPurchase,
   GooglePlayError,
+  stateGrantsAccess,
   toSubscriptionStatus,
   type VerifiedPurchase,
 } from "@/lib/appwrite/google-play";
@@ -30,6 +31,7 @@ import {
   claimPlayNotification,
   finishPlayNotification,
   GOOGLE_NOTIFICATION,
+  listPlans,
 } from "@/lib/appwrite/subscriptions";
 
 export type VerifyPurchaseResult =
@@ -124,12 +126,41 @@ export async function verifyAndApplyPurchase(input: {
 
   const status = toSubscriptionStatus(purchase.state);
 
-  if (status === "expired" || status === "on_hold" || status === "paused") {
+  // Only a state that grants access may be acknowledged and granted. `pending`
+  // is the one that matters: a pay-later purchase (cash at a store, some
+  // carrier billing) has not been paid for yet, and treating it as active
+  // handed premium to anyone who opened a checkout. When the money arrives
+  // Play moves it to ACTIVE, and the app re-verifies the token on its next
+  // launch.
+  if (!stateGrantsAccess(purchase.state)) {
     return {
       ok: false,
-      message: `That subscription is ${status.replace(/_/g, " ")}.`,
+      message:
+        status === "pending"
+          ? "That payment has not completed yet. Premium unlocks as soon as Google confirms it."
+          : `That subscription is ${status.replace(/_/g, " ")}.`,
       status: 409,
       subscriptionStatus: status,
+    };
+  }
+
+  const productId = purchase.productId || input.productId;
+
+  // The plan has to exist BEFORE anything is acknowledged. Acknowledging and
+  // then failing to grant leaves a member who has paid, has no access, and
+  // will not be refunded automatically. Left unacknowledged, the app retries,
+  // and if nobody adds the plan Google refunds it after three days.
+  const plans = await listPlans();
+
+  if (!plans.some((plan) => plan.googleProductId === productId)) {
+    console.error(
+      `[billing] no subscription_plans row for Play product "${productId}"; purchase left unacknowledged. Run pnpm appwrite:seed:plans.`,
+    );
+    return {
+      ok: false,
+      message:
+        "This plan is not set up yet. Your purchase is safe and will be activated automatically.",
+      status: 503,
     };
   }
 
@@ -140,7 +171,7 @@ export async function verifyAndApplyPurchase(input: {
 
   if (!acknowledged) {
     try {
-      await acknowledgeSubscription(purchase.productId || input.productId, input.purchaseToken);
+      await acknowledgeSubscription(productId, input.purchaseToken);
       acknowledged = true;
     } catch (error) {
       // Do not fail the request. The member paid, and access is the thing they
@@ -153,19 +184,38 @@ export async function verifyAndApplyPurchase(input: {
     }
   }
 
-  const applied = await applyGooglePurchase({
-    userId: input.userId,
-    productId: purchase.productId || input.productId,
-    purchaseToken: input.purchaseToken,
-    orderId: purchase.orderId || input.orderId || "",
-    autoRenewing: purchase.autoRenewing,
-    isAcknowledged: acknowledged,
-    expiresAt: purchase.expiresAt || undefined,
-    basePlanId: purchase.basePlanId || undefined,
-    offerId: purchase.offerId || undefined,
-    linkedPurchaseToken: purchase.linkedPurchaseToken || undefined,
-    obfuscatedAccountId: purchase.obfuscatedAccountId || undefined,
-  });
+  let applied: Awaited<ReturnType<typeof applyGooglePurchase>>;
+
+  try {
+    applied = await applyGooglePurchase({
+      userId: input.userId,
+      productId,
+      purchaseToken: input.purchaseToken,
+      orderId: purchase.orderId || input.orderId || "",
+      autoRenewing: purchase.autoRenewing,
+      isAcknowledged: acknowledged,
+      expiresAt: purchase.expiresAt || undefined,
+      basePlanId: purchase.basePlanId || undefined,
+      offerId: purchase.offerId || undefined,
+      linkedPurchaseToken: purchase.linkedPurchaseToken || undefined,
+      obfuscatedAccountId: purchase.obfuscatedAccountId || undefined,
+      isTestPurchase: purchase.isTestPurchase,
+    });
+  } catch (error) {
+    // Verified and (usually) acknowledged, but not recorded. A 503 sends the
+    // app down its retry path, and a second call with the same token updates
+    // or creates the row - so retrying is the whole fix.
+    console.error(
+      "[billing] grant failed for a verified purchase:",
+      error instanceof Error ? error.message : error,
+    );
+    return {
+      ok: false,
+      message:
+        "Your purchase went through but could not be activated yet. It will be retried automatically.",
+      status: 503,
+    };
+  }
 
   return {
     ok: true,
@@ -362,12 +412,19 @@ export async function handlePlayNotification(
     // which reads as no access to somebody who has just been charged.
     let expiresAt: string | undefined;
     let autoRenewing: boolean | undefined;
+    // A renewal is a new charge with its own order id (GPA.….0, ….1), and
+    // only the re-read carries it. Without it the renewal is never written to
+    // `payments` and revenue shows month one and nothing after.
+    let orderId: string | undefined;
+    let isTestPurchase = false;
 
     if (kind === "subscription") {
       try {
         const current = await getSubscriptionPurchase(purchaseToken);
         expiresAt = current.expiresAt || undefined;
         autoRenewing = current.autoRenewing;
+        orderId = current.orderId || undefined;
+        isTestPurchase = current.isTestPurchase;
       } catch (error) {
         // Not fatal. The status change still applies; only the date is lost,
         // and the next notification will carry it.
@@ -387,6 +444,8 @@ export async function handlePlayNotification(
       purchaseToken,
       expiresAt,
       autoRenewing,
+      orderId,
+      isTestPurchase,
     });
 
     if (!applied.ok) {
