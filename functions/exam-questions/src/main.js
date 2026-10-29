@@ -430,6 +430,24 @@ function toQuestionPayload(row) {
   }
 }
 
+/**
+ * A network failure inside the SDK surfaces as a bare "fetch failed"; the
+ * reason is on `cause`. On the node-26 runtime that reason was undici 8
+ * rejecting node-appwrite's bundled undici 6 agent ("invalid onError method"),
+ * and without the cause the log said nothing useful.
+ */
+function describeCause(caught) {
+  const parts = []
+  let cause = caught && caught.cause
+
+  for (let depth = 0; cause && depth < 3; depth += 1) {
+    parts.push([cause.code, cause.message].filter(Boolean).join(" "))
+    cause = cause.cause
+  }
+
+  return parts.length ? ` (cause: ${parts.join(" <- ")})` : ""
+}
+
 // ─── Entry point ────────────────────────────────────────────────────────────
 
 const ACTIONS = {
@@ -476,7 +494,7 @@ const handler = async ({ req, res, log, error }) => {
     }
 
     const message = caught instanceof Error ? caught.message : String(caught)
-    error(`exam-questions failed for ${userId}: ${message}`)
+    error(`exam-questions failed for ${userId}: ${message}${describeCause(caught)}`)
     log(caught && caught.stack ? caught.stack : message)
 
     // The detail stays in the function log; members get a generic message.

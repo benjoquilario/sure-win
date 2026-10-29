@@ -1,19 +1,29 @@
-import { memo, useMemo, useState } from "react"
+import { memo, useMemo, useState, type ReactNode } from "react"
+import BookOpen from "lucide-react-native/icons/book-open"
+import Eye from "lucide-react-native/icons/eye"
+import ListChecks from "lucide-react-native/icons/list-checks"
 import Play from "lucide-react-native/icons/play"
+import Target from "lucide-react-native/icons/target"
+import Timer from "lucide-react-native/icons/timer"
 import { View } from "react-native"
 
 import type { ExamCategory } from "@/lib/content/exam-categories"
 import { resolvePaperRules } from "@/lib/content/paper-rules"
 import type { QuestionSet } from "@/lib/content/question-sets"
-import type {
-  FeedbackTiming,
-  MemberSettings,
-  QuestionSource,
+import {
+  FEEDBACK_TIMING_LABELS,
+  type FeedbackTiming,
+  type MemberSettings,
+  type QuestionSource,
 } from "@/lib/member/settings"
+import { useContentPadding } from "@/hooks/use-layout"
+import { useThemePalette } from "@/hooks/use-theme"
 import { Badge } from "@/components/ui/badge"
+import { BottomBar } from "@/components/ui/bottom-bar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Text } from "@/components/ui/text"
+import { ScrollView } from "@/components/ui/virtualized-scroll-view"
 
 import { PaywallNotice } from "./paywall-notice"
 import {
@@ -32,6 +42,10 @@ import {
  * away — the pickers are overrides for this sitting, not a second settings
  * screen. What they choose here is passed to the runner rather than saved,
  * because "I want a short one today" is not a preference change.
+ *
+ * Owns its scroll view so Start can live in a pinned bar: the primary action
+ * of this screen belongs in the thumb zone whatever the scroll position. The
+ * parent must not claim the bottom safe-area edge (see `BottomBar`).
  */
 
 export type SessionSetupChoice = {
@@ -66,13 +80,13 @@ export const SessionSetupPanel = memo(function SessionSetupPanel({
   onStart,
   onUpgrade,
 }: SessionSetupPanelProps) {
+  const theme = useThemePalette()
+  const readingPadding = useContentPadding("reading")
+  const rules = resolvePaperRules(category, set)
+
   const lengthOptions = useMemo(
-    () =>
-      buildLengthOptions(
-        availableCount,
-        resolvePaperRules(category, set).timeLimitMinutes
-      ),
-    [availableCount, category, set]
+    () => buildLengthOptions(availableCount, rules.timeLimitMinutes),
+    [availableCount, rules.timeLimitMinutes]
   )
 
   const [lengthId, setLengthId] = useState(() => lengthOptions[0]?.id ?? "full")
@@ -87,94 +101,169 @@ export const SessionSetupPanel = memo(function SessionSetupPanel({
     lengthOptions.find((option) => option.id === lengthId) ??
     lengthOptions[lengthOptions.length - 1]
 
-  const summary = describeSession(
-    { feedbackTiming, shuffleQuestions: settings.shuffleQuestions },
-    selectedLength?.questionCount ?? availableCount,
-    selectedLength?.minutes ?? 0
-  )
-
+  const questionCount = selectedLength?.questionCount ?? availableCount
+  const minutes = selectedLength?.minutes ?? 0
   const isEmpty = availableCount === 0
+  const title = set ? set.title : category.title
 
   return (
-    <View className="gap-4">
-      <Card>
-        <CardContent className="gap-2">
-          <View className="flex-row flex-wrap items-center gap-2">
-            <Text variant="heading">{set ? set.title : category.title}</Text>
-            {set?.setCode ? (
-              <Badge tone="primary" size="sm">
-                Set {set.setCode}
-              </Badge>
-            ) : null}
-            {resumeLabel ? (
-              <Badge tone="warning" size="sm">
-                {resumeLabel}
-              </Badge>
-            ) : null}
-          </View>
+    <View className="flex-1">
+      <ScrollView
+        contentContainerClassName="gap-4"
+        contentContainerStyle={{
+          ...readingPadding,
+          paddingTop: 16,
+          paddingBottom: 24,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card>
+          <CardContent className="gap-3">
+            <View className="flex-row items-start gap-3">
+              <View className="h-11 w-11 items-center justify-center rounded-md bg-primary/10">
+                <BookOpen size={20} color={theme.primary} strokeWidth={2.2} />
+              </View>
 
-          <Text variant="caption">
-            {set?.description || category.description || "Board exam review."}
-          </Text>
+              <View className="min-w-0 flex-1 gap-1">
+                <View className="flex-row flex-wrap items-center gap-1.5">
+                  <Text variant="heading" className="shrink">
+                    {title}
+                  </Text>
+                  {set?.setCode ? (
+                    <Badge tone="primary" size="sm">
+                      Set {set.setCode}
+                    </Badge>
+                  ) : null}
+                  {resumeLabel ? (
+                    <Badge tone="warning" size="sm">
+                      {resumeLabel}
+                    </Badge>
+                  ) : null}
+                </View>
 
-          <Text variant="label">
-            {availableCount} {availableCount === 1 ? "item" : "items"} available
-          </Text>
-        </CardContent>
-      </Card>
+                <Text variant="caption" numberOfLines={2}>
+                  {set?.description ||
+                    category.description ||
+                    "Board exam review."}
+                </Text>
+              </View>
+            </View>
 
-      {hiddenCount > 0 ? (
-        <PaywallNotice
-          hiddenCount={hiddenCount}
-          contextLabel={set ? set.title : category.title}
-          onUpgrade={onUpgrade}
-        />
-      ) : null}
+            <View className="flex-row flex-wrap gap-x-4 gap-y-1.5 border-t border-border/60 pt-3">
+              <PaperFact icon={<ListChecks size={14} color={theme.primary} />}>
+                {availableCount} {availableCount === 1 ? "item" : "items"}
+              </PaperFact>
+              {rules.timeLimitMinutes ? (
+                <PaperFact icon={<Timer size={14} color={theme.primary} />}>
+                  {rules.timeLimitMinutes} min limit
+                </PaperFact>
+              ) : null}
+              <PaperFact icon={<Target size={14} color={theme.primary} />}>
+                Pass at {rules.passingScore}%
+              </PaperFact>
+            </View>
+          </CardContent>
+        </Card>
+
+        {hiddenCount > 0 ? (
+          <PaywallNotice
+            hiddenCount={hiddenCount}
+            contextLabel={title}
+            onUpgrade={onUpgrade}
+          />
+        ) : null}
+
+        {isEmpty ? null : (
+          <Card>
+            <CardContent className="gap-4">
+              <SessionLengthPicker
+                options={lengthOptions}
+                selectedId={selectedLength?.id ?? lengthId}
+                onSelect={(option) => setLengthId(option.id)}
+              />
+
+              <View className="h-px bg-border/60" />
+
+              <FeedbackTimingPicker
+                value={feedbackTiming}
+                onChange={setFeedbackTiming}
+              />
+
+              <View className="h-px bg-border/60" />
+
+              <QuestionSourcePicker
+                value={questionSource}
+                onChange={setQuestionSource}
+                availability={sourceAvailability}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </ScrollView>
 
       {isEmpty ? null : (
-        <>
-          <SessionLengthPicker
-            options={lengthOptions}
-            selectedId={selectedLength?.id ?? lengthId}
-            onSelect={(option) => setLengthId(option.id)}
-          />
-
-          <FeedbackTimingPicker
-            value={feedbackTiming}
-            onChange={setFeedbackTiming}
-          />
-
-          <QuestionSourcePicker
-            value={questionSource}
-            onChange={setQuestionSource}
-            availability={sourceAvailability}
-          />
-
-          <View className="gap-2 pt-1">
-            <Text variant="caption" className="text-center">
-              {summary}
-            </Text>
-
-            {/* Full width, at the bottom of the scroll: the primary action of
-                this screen belongs in the thumb zone. */}
-            <Button
-              size="xl"
-              onPress={() =>
-                onStart({
-                  questionCount:
-                    selectedLength?.questionCount ?? availableCount,
-                  minutes: selectedLength?.minutes ?? 0,
-                  feedbackTiming,
-                  questionSource,
-                })
-              }
+        <BottomBar width="reading" minInset={16} contentClassName="gap-2.5">
+          {/* The sitting about to start, in the order the pickers ask. */}
+          <View className="flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <PaperFact
+              icon={<ListChecks size={13} color={theme.mutedForeground} />}
             >
-              <Play size={16} color="white" fill="white" />
-              <Text>{resumeLabel ? "Continue" : "Start"}</Text>
-            </Button>
+              {questionCount} items
+            </PaperFact>
+            {minutes > 0 ? (
+              <PaperFact
+                icon={<Timer size={13} color={theme.mutedForeground} />}
+              >
+                {minutes} min
+              </PaperFact>
+            ) : null}
+            <PaperFact icon={<Eye size={13} color={theme.mutedForeground} />}>
+              {FEEDBACK_TIMING_LABELS[feedbackTiming].title}
+            </PaperFact>
           </View>
-        </>
+
+          <Button
+            size="xl"
+            accessibilityHint={describeSession(
+              { feedbackTiming, shuffleQuestions: settings.shuffleQuestions },
+              questionCount,
+              minutes
+            )}
+            onPress={() =>
+              onStart({
+                questionCount,
+                minutes,
+                feedbackTiming,
+                questionSource,
+              })
+            }
+          >
+            <Play
+              size={16}
+              color={theme.primaryForeground}
+              fill={theme.primaryForeground}
+            />
+            <Text>{resumeLabel ? "Continue" : "Start"}</Text>
+          </Button>
+        </BottomBar>
       )}
     </View>
   )
 })
+
+function PaperFact({
+  icon,
+  children,
+}: {
+  icon: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <View className="flex-row items-center gap-1.5">
+      {icon}
+      <Text variant="caption" className="font-semibold">
+        {children}
+      </Text>
+    </View>
+  )
+}

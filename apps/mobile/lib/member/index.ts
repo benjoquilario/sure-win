@@ -1,7 +1,7 @@
 export {
   describeBillingPeriod,
   getMonthlyEquivalent,
-  getYearlySavingPercent,
+  getSavingPercent,
   listSubscriptionPlans,
   toSubscriptionPlan,
   type SubscriptionPlan,

@@ -32,8 +32,12 @@ const SANDBOX_PATH = "/api/billing/verify/sandbox"
  */
 const TIMEOUT_MS = 25_000
 
-/** Not-active reasons a `409` distinguishes, same vocabulary as `subscriptions.status`. */
-export type NotActiveStatus = "expired" | "on_hold" | "paused"
+/**
+ * Not-active reasons a `409` distinguishes, same vocabulary as
+ * `subscriptions.status`. `pending` is a pay-later purchase Google has not
+ * been paid for yet — not a failure, and it becomes active on its own.
+ */
+export type NotActiveStatus = "expired" | "on_hold" | "paused" | "pending"
 
 export type VerifyOutcome =
   /** Recorded. Re-read `user_profiles`; do not unlock anything locally. */
@@ -153,7 +157,8 @@ export async function verifyPurchase(
     subscription?: { id?: string; created?: boolean; expiresAt?: string }
   } | null
 
-  const message = payload?.message ?? `Verification failed (${response.status}).`
+  const message =
+    payload?.message ?? `Verification failed (${response.status}).`
 
   if (response.ok && payload?.ok) {
     // `created: false` is not an error — the purchase was already recorded and
@@ -189,5 +194,10 @@ export async function verifyPurchase(
 }
 
 function isNotActiveStatus(value: unknown): value is NotActiveStatus {
-  return value === "expired" || value === "on_hold" || value === "paused"
+  return (
+    value === "expired" ||
+    value === "on_hold" ||
+    value === "paused" ||
+    value === "pending"
+  )
 }

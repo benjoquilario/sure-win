@@ -1,22 +1,38 @@
 import { memo } from "react"
+import AlarmClock from "lucide-react-native/icons/alarm-clock"
+import BellRing from "lucide-react-native/icons/bell-ring"
+import CalendarDays from "lucide-react-native/icons/calendar-days"
 
 import type { MemberSettings } from "@/lib/member/settings"
 import { Text } from "@/components/ui/text"
 
-import { SettingsStepperRow, SettingsSwitchRow } from "./settings-rows"
+import {
+  SettingsLinkRow,
+  SettingsStepperRow,
+  SettingsSwitchRow,
+} from "./settings-rows"
 import { SettingsSection } from "./settings-section"
 
 /**
- * Goals and reminders.
+ * The exam date and the daily nudge towards it.
+ *
+ * The exam date is a device preference (it drives the Home countdown); it used
+ * to be settable only from that card, which is not where anyone looks for it
+ * once the card has scrolled out of mind.
  *
  * `reminderTime` is stored as `"19:00"` **text** with a `timezone` beside it,
- * because it is a wall-clock time rather than an instant — 7pm should still be
+ * because it is a wall-clock time rather than an instant: 7pm should still be
  * 7pm when the member travels. The local notification is scheduled from those
  * two; nothing is converted to UTC.
  */
 
 type ReminderSectionProps = {
   settings: MemberSettings
+  /** Short countdown for the value slot, "128 days left"; null when unset. */
+  examDateValue: string | null
+  /** The full schedule line, "Nov 20, 2026 · 8:00 AM". */
+  examDateDetail: string | null
+  onPressExamDate: () => void
   onChange: (patch: Partial<MemberSettings>) => void
 }
 
@@ -36,14 +52,19 @@ function formatHour(hour: number) {
 
 export const ReminderSection = memo(function ReminderSection({
   settings,
+  examDateValue,
+  examDateDetail,
+  onPressExamDate,
   onChange,
 }: ReminderSectionProps) {
   const hour = parseHour(settings.reminderTime)
 
   return (
     <SettingsSection
-      title="Goals and reminders"
-      description="A daily target, and a nudge if you want one."
+      id="exam-day"
+      title="Exam day and reminders"
+      description="Your target date, and a daily nudge towards it."
+      keywords={["notification", "alert", "countdown", "schedule"]}
       footer={
         settings.reminderEnabled ? (
           <Text variant="caption">
@@ -52,27 +73,31 @@ export const ReminderSection = memo(function ReminderSection({
         ) : null
       }
     >
-      <SettingsStepperRow
-        label="Daily goal"
-        description="Questions to answer each day."
-        value={settings.dailyGoalQuestions}
-        min={0}
-        max={200}
-        step={5}
-        formatValue={(value) => (value === 0 ? "Off" : String(value))}
-        onChange={(dailyGoalQuestions) => onChange({ dailyGoalQuestions })}
+      <SettingsLinkRow
+        icon={CalendarDays}
+        tone="accent"
+        label="Board exam date"
+        description={examDateDetail ?? "Set it and Home counts down the days."}
+        keywords={["licensure", "countdown", "date"]}
+        value={examDateValue ?? "Not set"}
+        onPress={onPressExamDate}
       />
 
       <SettingsSwitchRow
-        label="Daily reminder"
-        description="One notification if you have not studied yet."
+        icon={BellRing}
+        label="Daily study reminder"
+        description="One notification a day if you have not studied yet."
+        keywords={["notification", "push"]}
         value={settings.reminderEnabled}
         onChange={(reminderEnabled) => onChange({ reminderEnabled })}
       />
 
       {settings.reminderEnabled ? (
         <SettingsStepperRow
+          icon={AlarmClock}
           label="Remind me at"
+          description="Pick the hour you usually study."
+          keywords={["time"]}
           value={hour}
           min={5}
           max={23}
@@ -85,45 +110,6 @@ export const ReminderSection = memo(function ReminderSection({
           }
         />
       ) : null}
-    </SettingsSection>
-  )
-})
-
-type NotificationSectionProps = ReminderSectionProps
-
-export const NotificationSection = memo(function NotificationSection({
-  settings,
-  onChange,
-}: NotificationSectionProps) {
-  return (
-    <SettingsSection title="Notifications" description="What we may send you.">
-      <SettingsSwitchRow
-        label="Announcements"
-        description="Board exam dates, new papers, results."
-        value={settings.notifyAnnouncements}
-        onChange={(notifyAnnouncements) => onChange({ notifyAnnouncements })}
-      />
-
-      <SettingsSwitchRow
-        label="Streak reminders"
-        description="A nudge before a streak lapses."
-        value={settings.notifyStreak}
-        onChange={(notifyStreak) => onChange({ notifyStreak })}
-      />
-
-      <SettingsSwitchRow
-        label="Community replies"
-        description="When somebody answers your post."
-        value={settings.notifyCommunity}
-        onChange={(notifyCommunity) => onChange({ notifyCommunity })}
-      />
-
-      <SettingsSwitchRow
-        label="Show me on the leaderboard"
-        description="Your name and score alongside other members."
-        value={settings.showOnLeaderboard}
-        onChange={(showOnLeaderboard) => onChange({ showOnLeaderboard })}
-      />
     </SettingsSection>
   )
 })

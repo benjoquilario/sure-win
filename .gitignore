@@ -63,3 +63,6 @@ yarn-error.log*
 # stray binaries / data dumps that landed in the mobile assets folder
 *.exe
 *.dump
+
+# graphify knowledge graph - local, rebuild with `graphify update .`
+graphify-out/

@@ -1,4 +1,4 @@
-import * as Crypto from "expo-crypto"
+import { loadExpoCrypto } from "./native-modules"
 
 /**
  * ─── The obfuscated account identifier ────────────────────────────────────
@@ -34,6 +34,15 @@ export async function getObfuscatedAccountId(userId: string): Promise<string> {
   if (!trimmed) {
     throw new Error(
       "Cannot derive an obfuscated account id without a signed-in user."
+    )
+  }
+
+  // Loaded on demand: see native-modules.ts for why it is not imported.
+  const Crypto = loadExpoCrypto()
+
+  if (!Crypto) {
+    throw new Error(
+      "This app build does not include expo-crypto. Install a newer build to purchase."
     )
   }
 

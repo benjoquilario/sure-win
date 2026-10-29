@@ -6,6 +6,7 @@ import { View } from "react-native"
 import { useThemePalette } from "@/hooks/use-theme"
 import { ContentFrame } from "@/components/ui/content-frame"
 import { IconButton } from "@/components/ui/icon-button"
+import { Text } from "@/components/ui/text"
 
 import { SessionProgress } from "./session-progress"
 import { SessionTimer } from "./session-timer"
@@ -40,16 +41,32 @@ export const SessionTopBar = memo(function SessionTopBar({
   const theme = useThemePalette()
 
   return (
-    <View className="border-b border-border/70 bg-background pb-3 pt-2">
+    <View className="border-b border-border/70 bg-background pb-2.5 pt-1.5">
       {/* Same measure as the question below, so the progress bar and the
           prompt share a left edge on a tablet. */}
-      <ContentFrame width="reading" className="gap-2.5">
+      <ContentFrame width="reading" className="gap-2">
         <View className="flex-row items-center gap-2">
           <IconButton label="Leave this sitting" size="sm" onPress={onExit}>
             <X size={19} color={theme.foreground} strokeWidth={2.4} />
           </IconButton>
 
-          <View className="flex-1" />
+          {/* Hidden from the screen reader: the progress bar below announces
+              the same thing as one sentence. */}
+          <View
+            className="min-w-0 flex-1"
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+          >
+            <Text className="text-sm font-extrabold text-foreground">
+              Question {position}
+              <Text className="text-sm font-semibold text-muted-foreground">
+                {` of ${total}`}
+              </Text>
+            </Text>
+            <Text variant="caption" numberOfLines={1}>
+              {answeredCount} answered
+            </Text>
+          </View>
 
           {endsAtMs ? (
             <SessionTimer endsAtMs={endsAtMs} onExpire={onExpire} />

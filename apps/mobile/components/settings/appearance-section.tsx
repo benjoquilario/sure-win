@@ -1,11 +1,12 @@
 import { memo } from "react"
+import Monitor from "lucide-react-native/icons/monitor-smartphone"
+import Moon from "lucide-react-native/icons/moon"
+import Sun from "lucide-react-native/icons/sun"
+import SunMoon from "lucide-react-native/icons/sun-moon"
+import Vibrate from "lucide-react-native/icons/vibrate"
 
 import type { ThemeMode } from "@/lib/app-preferences"
-import type {
-  AppLanguage,
-  FontScale,
-  MemberSettings,
-} from "@/lib/member/settings"
+import type { MemberSettings } from "@/lib/member/settings"
 
 import {
   SettingsOptionRow,
@@ -19,27 +20,33 @@ import { SettingsSection } from "./settings-section"
  *
  * `theme` lives on `user_settings` so it follows the member to a new device,
  * *and* in the local preference store so the app can paint the right colours on
- * the very first frame — before any network call. The screen writes both; the
+ * the very first frame, before any network call. The screen writes both; the
  * local one is the render source and the stored one is the source of truth on a
  * fresh install.
+ *
+ * Text size, language and sound used to be here too. They saved, but nothing
+ * in the app read them, so they changed nothing; they come back when they do.
  */
 
 const THEME_OPTIONS: SettingsOption<ThemeMode>[] = [
-  { value: "system", label: "System", description: "Follow your device." },
-  { value: "light", label: "Light", description: "Bright, for daytime." },
-  { value: "dark", label: "Dark", description: "Lower glare, for evenings." },
-]
-
-const FONT_SCALE_OPTIONS: SettingsOption<FontScale>[] = [
-  { value: "small", label: "Small" },
-  { value: "medium", label: "Default" },
-  { value: "large", label: "Large" },
-  { value: "xlarge", label: "Largest" },
-]
-
-const LANGUAGE_OPTIONS: SettingsOption<AppLanguage>[] = [
-  { value: "en", label: "English" },
-  { value: "fil", label: "Filipino" },
+  {
+    value: "system",
+    label: "System",
+    description: "Follows your device's light or dark setting.",
+    icon: Monitor,
+  },
+  {
+    value: "light",
+    label: "Light",
+    description: "Bright, for daytime study.",
+    icon: Sun,
+  },
+  {
+    value: "dark",
+    label: "Dark",
+    description: "Lower glare, for late-night review.",
+    icon: Moon,
+  },
 ]
 
 type AppearanceSectionProps = {
@@ -57,11 +64,15 @@ export const AppearanceSection = memo(function AppearanceSection({
 }: AppearanceSectionProps) {
   return (
     <SettingsSection
+      id="appearance"
       title="Appearance"
       description="How the app looks and feels."
+      keywords={["display", "look"]}
     >
       <SettingsOptionRow
+        icon={SunMoon}
         label="Theme"
+        keywords={["dark mode", "light mode", "colour", "color"]}
         options={THEME_OPTIONS}
         value={themeMode}
         onChange={(mode) => {
@@ -70,30 +81,11 @@ export const AppearanceSection = memo(function AppearanceSection({
         }}
       />
 
-      <SettingsOptionRow
-        label="Text size"
-        options={FONT_SCALE_OPTIONS}
-        value={settings.fontScale}
-        onChange={(fontScale) => onChangeSettings({ fontScale })}
-      />
-
-      <SettingsOptionRow
-        label="Language"
-        options={LANGUAGE_OPTIONS}
-        value={settings.language}
-        onChange={(language) => onChangeSettings({ language })}
-      />
-
       <SettingsSwitchRow
-        label="Sound"
-        description="A short tone when an answer is marked."
-        value={settings.soundEnabled}
-        onChange={(soundEnabled) => onChangeSettings({ soundEnabled })}
-      />
-
-      <SettingsSwitchRow
+        icon={Vibrate}
         label="Haptics"
-        description="A tap you can feel when you choose."
+        description="A tap you can feel when you answer and navigate."
+        keywords={["vibration", "vibrate"]}
         value={settings.hapticsEnabled}
         onChange={(hapticsEnabled) => onChangeSettings({ hapticsEnabled })}
       />

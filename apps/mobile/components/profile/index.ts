@@ -1,6 +1,7 @@
 // ─── Profile screen, top to bottom ──────────────────────────────────────────
-export { ProfileTopBar } from "./profile-top-bar"
-export { ProfileIdentityCard } from "./profile-identity-card"
+export { ProfileOverviewCard } from "./profile-overview-card"
+export { ExamReadinessCard } from "./exam-readiness-card"
+export { ProfileStatsGrid } from "./profile-stats-grid"
 export { ProfileProgressCard } from "./profile-progress-card"
 export {
   AchievementsSection,
@@ -21,6 +22,10 @@ export {
 } from "./profile-achievements"
 
 // ─── Superseded by the sections above ───────────────────────────────────────
+// ProfileTopBar and ProfileIdentityCard were replaced by the account overview
+// in the 2026-09-26 redesign.
+export { ProfileTopBar } from "./profile-top-bar"
+export { ProfileIdentityCard } from "./profile-identity-card"
 // The tabbed layout is gone: Details, Activity and Performance are now one
 // scroll. Kept because these files were never committed, so removing them
 // would not be recoverable from git — delete once the new Profile has proven

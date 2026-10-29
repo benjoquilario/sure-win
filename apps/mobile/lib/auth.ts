@@ -1,6 +1,12 @@
 import { AppwriteException, Models } from "react-native-appwrite"
 
 import {
+  isMemberType,
+  ownedRowPermissions,
+  type UserProfileDocument,
+} from "@workspace/schema"
+
+import {
   account,
   APPWRITE_CONFIG,
   assertAppwriteConfigured,
@@ -28,11 +34,6 @@ import {
   type MemberProfile,
   type MemberProfileEdit,
 } from "./member/profile"
-import {
-  isMemberType,
-  ownedRowPermissions,
-  type UserProfileDocument,
-} from "@workspace/schema"
 import { upsertPublicProfile } from "./member/public-profile"
 
 const REQUEST_TIMEOUT_MS = 12_000
@@ -132,7 +133,7 @@ function getVerificationRedirectUrl() {
 
   if (!redirectUrl) {
     throw new Error(
-      "Email verification is not configured. Set EXPO_PUBLIC_APPWRITE_EMAIL_REDIRECT_URL to an HTTPS URL registered as a Web platform in Appwrite. That URL should forward back to reviewer://verify-email."
+      "Email verification is not configured. Set EXPO_PUBLIC_APPWRITE_EMAIL_REDIRECT_URL to the CMS page, e.g. https://<cms-host>/verify-email, and register that host as a Web platform in Appwrite."
     )
   }
 
@@ -311,7 +312,9 @@ function getBootstrapFailureMessage() {
   return "Your account was created, but Appwrite blocked the app from creating your profile row. In the Appwrite console, user_profiles needs the member_private access model: document security on, with create granted to the users role and each row carrying its owner's permissions. See section 11 of MOBILE-SCHEMA-NOTES-v4.md."
 }
 
-async function fetchExistingProfile(user: AuthUser): Promise<UserProfile | null> {
+async function fetchExistingProfile(
+  user: AuthUser
+): Promise<UserProfile | null> {
   try {
     const profile = await withRetry("Profile lookup", () =>
       tablesDB.getRow({

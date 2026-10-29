@@ -1,15 +1,19 @@
 import { memo } from "react"
 import { View } from "react-native"
 
+import { withOpacity } from "@/lib/theme"
 import { useThemePalette } from "@/hooks/use-theme"
-import { Text } from "@/components/ui/text"
 
 /**
  * How far through the sitting they are.
  *
- * A single filled track rather than a percentage label: the denominator here
- * is the run length, and members read position far faster than they read
- * "43%".
+ * A filled track rather than a percentage label: the denominator here is the
+ * run length, and members read position far faster than they read "43%". The
+ * words ("Question 3 of 20 · 2 answered") live in the top bar beside it, so
+ * this stays a single quiet line under the controls.
+ *
+ * Two layers: what has been answered, tinted, under where they are now, solid.
+ * Jumping ahead past unanswered items is then visible at a glance.
  */
 
 type SessionProgressProps = {
@@ -25,28 +29,28 @@ export const SessionProgress = memo(function SessionProgress({
 }: SessionProgressProps) {
   const theme = useThemePalette()
   const safeTotal = Math.max(total, 1)
-  const percent = Math.min((position / safeTotal) * 100, 100)
+  const positionPercent = Math.min((position / safeTotal) * 100, 100)
+  const answeredPercent = Math.min((answeredCount / safeTotal) * 100, 100)
 
   return (
-    <View className="gap-1.5">
-      <View className="flex-row items-center justify-between">
-        <Text variant="label">
-          {position} / {total}
-        </Text>
-        <Text variant="label">{answeredCount} answered</Text>
-      </View>
-
+    <View
+      className="h-1.5 overflow-hidden rounded-full"
+      style={{ backgroundColor: theme.muted }}
+      accessibilityRole="progressbar"
+      accessibilityLabel={`Question ${position} of ${total}, ${answeredCount} answered`}
+      accessibilityValue={{ min: 0, max: total, now: position }}
+    >
       <View
-        className="h-1.5 overflow-hidden rounded-full"
-        style={{ backgroundColor: theme.muted }}
-        accessibilityRole="progressbar"
-        accessibilityValue={{ min: 0, max: total, now: position }}
-      >
-        <View
-          className="h-full rounded-full"
-          style={{ width: `${percent}%`, backgroundColor: theme.primary }}
-        />
-      </View>
+        className="absolute inset-y-0 left-0 rounded-full"
+        style={{
+          width: `${answeredPercent}%`,
+          backgroundColor: withOpacity(theme.primary, 0.3),
+        }}
+      />
+      <View
+        className="h-full rounded-full"
+        style={{ width: `${positionPercent}%`, backgroundColor: theme.primary }}
+      />
     </View>
   )
 })

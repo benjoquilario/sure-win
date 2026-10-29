@@ -6,10 +6,10 @@ import type {
   PresentedChoice,
   PresentedQuestion,
 } from "@/lib/session/question-pool"
-import { Card, CardContent } from "@/components/ui/card"
+
 import { ChoiceList } from "./choice-list"
-import { QuestionActions } from "./question-actions"
 import { ExplanationPanel } from "./explanation-panel"
+import { QuestionActions } from "./question-actions"
 import { QuestionPrompt } from "./question-prompt"
 
 /**
@@ -61,45 +61,44 @@ export const ExamQuestionCard = memo(function ExamQuestionCard({
     (choice) => choice.index === question.answerIndex
   )
 
+  // No card around the question: the choices are the tappable surfaces, and a
+  // card holding cards draws two borders around every option. The stem sits on
+  // the page, like the paper it stands in for.
   return (
-    <Card>
-      <CardContent className="gap-4">
-        <QuestionPrompt
-          question={question}
-          position={presented.position}
-          total={total}
+    <View className="gap-5">
+      <QuestionPrompt
+        question={question}
+        position={presented.position}
+        total={total}
+      />
+
+      <ChoiceList
+        presented={presented}
+        selectedIndex={selectedIndex}
+        isGraded={isGraded}
+        onSelect={onSelect}
+      />
+
+      {/* Nothing is reserved for the panel before it resolves: its height
+            depends on the explanation's length, and a placeholder that jumps
+            to a different size is worse than one that appears. */}
+      {isGraded ? (
+        <ExplanationPanel
+          isCorrect={isCorrect}
+          correctAnswerLabel={correctChoice?.displayLabel}
+          correctAnswerText={correctChoice?.text}
+          explanation={question.explanation}
+          showExplanation={showExplanations}
         />
+      ) : null}
 
-        <ChoiceList
-          presented={presented}
-          selectedIndex={selectedIndex}
-          isGraded={isGraded}
-          onSelect={onSelect}
+      {onToggleSave && onReport ? (
+        <QuestionActions
+          isSaved={isSaved}
+          onToggleSave={onToggleSave}
+          onReport={onReport}
         />
-
-        {isGraded ? (
-          <ExplanationPanel
-            isCorrect={isCorrect}
-            correctAnswerLabel={correctChoice?.displayLabel}
-            correctAnswerText={correctChoice?.text}
-            explanation={question.explanation}
-            showExplanation={showExplanations}
-          />
-        ) : (
-          // Reserved space would be nice here, but the panel's height depends
-          // on the explanation's length — so nothing is drawn instead of a
-          // placeholder that jumps to a different size when it resolves.
-          <View />
-        )}
-
-        {onToggleSave && onReport ? (
-          <QuestionActions
-            isSaved={isSaved}
-            onToggleSave={onToggleSave}
-            onReport={onReport}
-          />
-        ) : null}
-      </CardContent>
-    </Card>
+      ) : null}
+    </View>
   )
 })

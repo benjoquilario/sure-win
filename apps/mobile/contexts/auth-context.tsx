@@ -48,6 +48,12 @@ type AuthStore = {
   register: (email: string, password: string, fullName: string) => Promise<void>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
+  /**
+   * Re-reads the Appwrite user as well as the profile. `refreshProfile` keeps
+   * the cached user, so a change made outside the app — the CMS verifying
+   * the email from a browser — would not show until the next sign-in.
+   */
+  reloadUser: () => Promise<void>
   updateProfile: (input: UpdateProfileInput) => Promise<void>
   updateEmail: (input: UpdateEmailInput) => Promise<void>
   uploadProfilePhoto: (input: UploadProfilePhotoInput) => Promise<string>
@@ -190,6 +196,26 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const user = get().user
 
     if (!user) {
+      return
+    }
+
+    const profile = await bootstrapProfileSafely(user)
+    if (!canApplyProfileSnapshot(get(), user.$id)) {
+      return
+    }
+    set(toAuthSnapshot({ status: "authenticated", user, profile }))
+  },
+  reloadUser: async () => {
+    const current = get().user
+
+    if (!current) {
+      return
+    }
+
+    const user = await getCurrentUser()
+
+    // Signed out, or a different account, by the time the read came back.
+    if (!user || !canApplyProfileSnapshot(get(), user.$id)) {
       return
     }
 

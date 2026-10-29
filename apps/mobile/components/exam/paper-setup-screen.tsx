@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from "react"
 import { useRouter } from "expo-router"
-import { View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { ExamCategory } from "@/lib/content/exam-categories"
@@ -155,6 +154,26 @@ export function PaperSetupScreen({ category, set }: PaperSetupScreenProps) {
     )
   }
 
+  if (availableCount > 0) {
+    // The panel scrolls itself and pins Start in a bottom bar, which paints
+    // its own inset, so this view must not claim the bottom edge as well.
+    return (
+      <SafeAreaView edges={["left", "right"]} className="flex-1 bg-background">
+        <SessionSetupPanel
+          category={category}
+          set={set}
+          availableCount={availableCount}
+          hiddenCount={questionsQuery.hiddenCount}
+          settings={settings}
+          sourceAvailability={sourceAvailability}
+          resumeLabel={resumeLabel}
+          onStart={handleStart}
+          onUpgrade={handleUpgrade}
+        />
+      </SafeAreaView>
+    )
+  }
+
   return (
     <SafeAreaView
       edges={["left", "right", "bottom"]}
@@ -168,7 +187,7 @@ export function PaperSetupScreen({ category, set }: PaperSetupScreenProps) {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {availableCount === 0 && questionsQuery.hiddenCount > 0 ? (
+        {questionsQuery.hiddenCount > 0 ? (
           // Paid, with no free sample at all. A hard stop that says so beats
           // a setup screen offering nought items.
           <LockedPaper
@@ -177,25 +196,11 @@ export function PaperSetupScreen({ category, set }: PaperSetupScreenProps) {
             onUpgrade={handleUpgrade}
             onBack={() => router.back()}
           />
-        ) : availableCount === 0 ? (
+        ) : (
           <EmptyState
             title="Nothing here yet"
             description="This paper has no published questions. Check back soon."
           />
-        ) : (
-          <View>
-            <SessionSetupPanel
-              category={category}
-              set={set}
-              availableCount={availableCount}
-              hiddenCount={questionsQuery.hiddenCount}
-              settings={settings}
-              sourceAvailability={sourceAvailability}
-              resumeLabel={resumeLabel}
-              onStart={handleStart}
-              onUpgrade={handleUpgrade}
-            />
-          </View>
         )}
       </ScrollView>
     </SafeAreaView>

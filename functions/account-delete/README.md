@@ -22,7 +22,9 @@ for tax and chargeback disputes, which Play's policy allows) and
 
 ## Console settings
 
-- Runtime: Node 20 or later. Entrypoint `main.js`. Build command `npm install`.
+- Runtime: **Node 22** (20-25 work). Not Node 26: its undici 8 rejects the
+  undici 6 agent node-appwrite 22 hands to `fetch`, so every call fails with
+  `fetch failed`. Entrypoint `main.js`. Build command `npm install`.
 - Execute access: **Users**.
 - Scopes: `rows.read`, `rows.write`, `users.write`. The runtime key from those
   scopes is used; `APPWRITE_API_KEY` is only a fallback.

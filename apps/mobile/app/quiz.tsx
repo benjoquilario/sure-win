@@ -443,7 +443,7 @@ export default function QuizScreen() {
       <ScrollView
         contentContainerStyle={{
           ...readingPadding,
-          paddingTop: 16,
+          paddingTop: 20,
           paddingBottom: 24,
         }}
         showsVerticalScrollIndicator={false}
