@@ -45,16 +45,24 @@ const SIGNING_CONFIG = `
 
 const BUILD_TYPE = `            signingConfig project.hasProperty('SUREWIN_UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug`
 
+// Both anchors accept the method-call form the template ships (`keyPassword
+// 'android'`) and the assignment form (`keyPassword = 'android'`). Other
+// plugins rewrite the file before this one sees it: expo-iap turns the
+// template's `signingConfig signingConfigs.debug` into
+// `signingConfig = signingConfigs.debug`, and an exact-string match on the
+// template broke the EAS prebuild.
+const DEBUG_CONFIG_END = /^[ \t]*keyPassword\s*=?\s*'android'[ \t]*\r?\n[ \t]*\}/m
+
+const RELEASE_TEMPLATE_LINE =
+  /^[ \t]*\/\/ Caution! In production, you need to generate your own keystore file\.[ \t]*\r?\n[ \t]*\/\/ see https:\/\/reactnative\.dev\/docs\/signed-apk-android\.[ \t]*\r?\n[ \t]*signingConfig\s*=?\s*signingConfigs\.debug[ \t]*$/m
+
 function addReleaseSigningConfig(contents) {
   if (contents.includes("SUREWIN_UPLOAD_STORE_FILE")) {
     return contents
   }
 
   // 1. Declare the release signingConfig alongside the template's debug one.
-  const debugConfigEnd = `            keyPassword 'android'
-        }`
-
-  if (!contents.includes(debugConfigEnd)) {
+  if (!DEBUG_CONFIG_END.test(contents)) {
     throw new Error(
       "[with-release-signing] Could not find the debug signingConfig in " +
         "app/build.gradle. The Expo template changed — update this plugin " +
@@ -63,21 +71,21 @@ function addReleaseSigningConfig(contents) {
     )
   }
 
-  let next = contents.replace(debugConfigEnd, debugConfigEnd + SIGNING_CONFIG)
+  let next = contents.replace(
+    DEBUG_CONFIG_END,
+    (debugConfigEnd) => debugConfigEnd + SIGNING_CONFIG
+  )
 
   // 2. Point the release buildType at it.
-  const templateLine = `            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug`
-
-  if (!next.includes(templateLine)) {
+  if (!RELEASE_TEMPLATE_LINE.test(next)) {
     throw new Error(
       "[with-release-signing] Could not find the release buildType's debug " +
-        "signingConfig line in app/build.gradle."
+        "signingConfig line in app/build.gradle. The Expo template or " +
+        "another plugin changed it — update this plugin."
     )
   }
 
-  next = next.replace(templateLine, BUILD_TYPE)
+  next = next.replace(RELEASE_TEMPLATE_LINE, BUILD_TYPE)
 
   return next
 }
